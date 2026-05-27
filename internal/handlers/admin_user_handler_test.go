@@ -35,6 +35,20 @@ func newAdminEcho() *echo.Echo {
 	return e
 }
 
+type captureAdminUserRenderer struct {
+	name string
+	data map[string]interface{}
+}
+
+func (r *captureAdminUserRenderer) Render(_ *echo.Context, w io.Writer, name string, data any) error {
+	r.name = name
+	if m, ok := data.(map[string]interface{}); ok {
+		r.data = m
+	}
+	_, _ = w.Write([]byte("ok"))
+	return nil
+}
+
 // --- fake admin user service ---
 
 type fakeAdminUserSvc struct {
@@ -47,6 +61,15 @@ type fakeAdminUserSvc struct {
 	updateErr error
 	blockErr  error
 	deleteErr error
+}
+
+type fakeAdminCitizenProfileLookup struct {
+	profile *models.CitizenProfile
+	err     error
+}
+
+func (r *fakeAdminCitizenProfileLookup) GetByUserID(_ string) (*models.CitizenProfile, error) {
+	return r.profile, r.err
 }
 
 func (s *fakeAdminUserSvc) ListUsers(_ repositories.UserFilter, _, _ int) ([]models.User, int64, error) {
@@ -265,6 +288,25 @@ func TestAdminUserHandler_ShowUser_NotFound(t *testing.T) {
 	err := h.ShowUser(c)
 	assert.NoError(t, err)
 	assert.Equal(t, http.StatusSeeOther, rec.Code)
+}
+
+func TestAdminUserHandler_ShowUser_CitizenIncludesCitizenProfile(t *testing.T) {
+	_ = configs.LoadI18nMessages("../../locales")
+	e := newTestEcho()
+	renderer := &captureAdminUserRenderer{}
+	e.Renderer = renderer
+
+	u := &models.User{ID: "u1", Name: "Citizen", Role: models.UserRoleCitizen}
+	profile := &models.CitizenProfile{UserID: "u1", Gender: "male", PermanentAddress: "Q1"}
+	svc := &fakeAdminUserSvc{user: u}
+	h := NewAdminUserHandler(svc).WithCitizenProfileRepo(&fakeAdminCitizenProfileLookup{profile: profile})
+
+	c, rec := newAdminCtx(e, http.MethodGet, "/admin/users/u1", "", "")
+	c.SetPathValues(echo.PathValues{{Name: "id", Value: "u1"}})
+	err := h.ShowUser(c)
+	assert.NoError(t, err)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.NotNil(t, renderer.data["CitizenProfile"])
 }
 
 // --- ShowEditForm ---

@@ -58,6 +58,9 @@ func SetupRoutes(e *echo.Echo, handler *ApiHandler) {
 	citizenWeb.POST("/applications", handler.CitizenWebHandler.SubmitApplication)
 	citizenWeb.GET("/applications/:id", handler.CitizenWebHandler.ShowApplicationDetail)
 	citizenWeb.POST("/applications/:id/supplements", handler.CitizenWebHandler.UploadApplicationSupplements)
+	citizenWeb.GET("/profile", handler.CitizenWebHandler.ShowProfilePage)
+	citizenWeb.POST("/profile", handler.CitizenWebHandler.UpdateProfile)
+	citizenWeb.POST("/profile/password", handler.CitizenWebHandler.ChangePassword)
 
 	// Admin auth (public)
 	e.GET("/admin/login", handler.AdminAuthHandler.ShowLoginPage)

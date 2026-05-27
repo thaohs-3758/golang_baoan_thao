@@ -41,6 +41,8 @@
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "ui.citizens.col.email" }}</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "ui.citizens.col.phone" }}</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "ui.citizens.col.dob" }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "ui.citizens.col.gender" }}</th>
+                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "ui.citizens.col.permanent_address" }}</th>
                 <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "ui.citizens.col.total_apps" }}</th>
               </tr>
             </thead>
@@ -59,12 +61,20 @@
                 <td class="px-4 py-3 text-sm text-gray-700">
                   {{ if .NgaySinh }}{{ .NgaySinh }}{{ else }}<span class="text-gray-400">—</span>{{ end }}
                 </td>
+                <td class="px-4 py-3 text-sm text-gray-700">
+                  {{ if .GioiTinh }}
+                    {{ if eq .GioiTinh "male" }}{{ t "ui.profile.personal.gender.male" }}{{ else if eq .GioiTinh "female" }}{{ t "ui.profile.personal.gender.female" }}{{ else if eq .GioiTinh "other" }}{{ t "ui.profile.personal.gender.other" }}{{ else }}{{ .GioiTinh }}{{ end }}
+                  {{ else }}<span class="text-gray-400">â€”</span>{{ end }}
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-700">
+                  {{ if .DiaChiThuongTru }}{{ .DiaChiThuongTru }}{{ else }}<span class="text-gray-400">â€”</span>{{ end }}
+                </td>
                 <td class="px-4 py-3 text-sm text-gray-700">{{ .TongHoSo }}</td>
               </tr>
               {{ end }}
               {{ else }}
               <tr>
-                <td colspan="6" class="text-gray-400 text-center py-8 text-sm">{{ t "ui.citizens.empty" }}</td>
+                <td colspan="8" class="text-gray-400 text-center py-8 text-sm">{{ t "ui.citizens.empty" }}</td>
               </tr>
               {{ end }}
             </tbody>

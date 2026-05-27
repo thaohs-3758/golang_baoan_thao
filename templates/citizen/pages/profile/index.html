@@ -1,0 +1,110 @@
+{{ define "content" }}
+<div class="mx-auto max-w-3xl space-y-6">
+  <div>
+    <h1 class="text-2xl font-semibold text-gray-900">{{ t "ui.profile.title" }}</h1>
+  </div>
+
+  {{ template "citizen/partials/toast.html" . }}
+
+  {{ if .Error }}
+  <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {{ .Error }}
+  </div>
+  {{ end }}
+
+  <section class="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+    <h2 class="text-sm font-semibold text-gray-700">{{ t "ui.profile.info_title" }}</h2>
+
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div>
+        <p class="text-xs text-gray-500">{{ t "ui.form.full_name" }}</p>
+        <p class="mt-0.5 text-sm font-medium text-gray-900">{{ .Profile.Name }}</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500">{{ t "ui.form.email" }}</p>
+        <p class="mt-0.5 text-sm font-medium text-gray-900">{{ .Profile.Email }}</p>
+      </div>
+      <div class="sm:col-span-2">
+        <p class="text-xs text-gray-500">{{ t "ui.form.cccd" }}</p>
+        <p class="mt-0.5 text-sm font-medium text-gray-900">{{ .Profile.CitizenIDNumber }}</p>
+      </div>
+    </div>
+
+    <form method="post" action="/citizen/profile" class="space-y-4">
+      <input type="hidden" name="_csrf" value="{{ .CSRFToken }}">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label class="grid gap-2">
+          <span class="text-sm font-medium text-gray-700">{{ t "ui.profile.contact.phone" }}</span>
+          <input type="text" name="phone"
+            value="{{ if .FormPhone }}{{ .FormPhone }}{{ else }}{{ .Profile.Phone }}{{ end }}"
+            class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+        </label>
+        <label class="grid gap-2">
+          <span class="text-sm font-medium text-gray-700">{{ t "ui.profile.contact.address" }}</span>
+          <input type="text" name="address"
+            value="{{ if .FormAddress }}{{ .FormAddress }}{{ else }}{{ .Profile.Address }}{{ end }}"
+            class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+        </label>
+        <label class="grid gap-2">
+          <span class="text-sm font-medium text-gray-700">{{ t "ui.profile.personal.date_of_birth" }}</span>
+          <input type="date" name="date_of_birth"
+            value="{{ if .FormDateOfBirth }}{{ .FormDateOfBirth }}{{ else if .Profile.DateOfBirth }}{{ .Profile.DateOfBirth.Format "2006-01-02" }}{{ end }}"
+            class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+        </label>
+        <label class="grid gap-2">
+          <span class="text-sm font-medium text-gray-700">{{ t "ui.profile.personal.gender" }}</span>
+          {{ $selectedGender := "" }}
+          {{ if .FormGender }}{{ $selectedGender = .FormGender }}{{ else }}{{ $selectedGender = .Profile.Gender }}{{ end }}
+          <select name="gender" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+            <option value="">{{ t "ui.profile.personal.gender.placeholder" }}</option>
+            <option value="male" {{ if eq $selectedGender "male" }}selected{{ end }}>{{ t "ui.profile.personal.gender.male" }}</option>
+            <option value="female" {{ if eq $selectedGender "female" }}selected{{ end }}>{{ t "ui.profile.personal.gender.female" }}</option>
+            <option value="other" {{ if eq $selectedGender "other" }}selected{{ end }}>{{ t "ui.profile.personal.gender.other" }}</option>
+          </select>
+        </label>
+        <label class="grid gap-2 sm:col-span-2">
+          <span class="text-sm font-medium text-gray-700">{{ t "ui.profile.personal.permanent_address" }}</span>
+          <input type="text" name="permanent_address"
+            value="{{ if .FormPermanentAddress }}{{ .FormPermanentAddress }}{{ else }}{{ .Profile.PermanentAddress }}{{ end }}"
+            class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+        </label>
+      </div>
+      <div>
+        <button type="submit"
+          class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
+          {{ t "ui.profile.contact.save" }}
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <section class="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+    <h2 class="text-sm font-semibold text-gray-700">{{ t "ui.profile.password_title" }}</h2>
+    <form method="post" action="/citizen/profile/password" class="space-y-4">
+      <input type="hidden" name="_csrf" value="{{ .CSRFToken }}">
+      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label class="grid gap-2 sm:col-span-2">
+          <span class="text-sm font-medium text-gray-700">{{ t "ui.profile.password.current" }}</span>
+          <input type="password" name="current_password" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" required>
+        </label>
+        <label class="grid gap-2">
+          <span class="text-sm font-medium text-gray-700">{{ t "ui.profile.password.new" }}</span>
+          <input type="password" name="new_password" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" required>
+        </label>
+        <label class="grid gap-2">
+          <span class="text-sm font-medium text-gray-700">{{ t "ui.profile.password.confirm" }}</span>
+          <input type="password" name="confirm_new_password" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm" required>
+        </label>
+      </div>
+      <div>
+        <button type="submit"
+          class="inline-flex items-center rounded-md bg-amber-600 px-4 py-2 text-sm font-medium text-white hover:bg-amber-700">
+          {{ t "ui.profile.password.save" }}
+        </button>
+      </div>
+    </form>
+  </section>
+</div>
+{{ end }}
+
+{{ template "citizen_base" . }}
