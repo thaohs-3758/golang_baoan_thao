@@ -54,7 +54,7 @@
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "service_type.code" }}</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "service_type.category" }}</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "service_type.department" }}</th>
-            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "service_type.active" }}</th>
+            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">{{ t "service_type.active" }}</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "service_type.processing_time" }}</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "service_type.fee" }}</th>
             <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{{ t "service_type.actions" }}</th>
@@ -79,7 +79,7 @@
                 <span class="text-gray-400">-</span>
               {{ end }}
             </td>
-            <td class="px-4 py-3 text-sm text-gray-700">
+            <td class="px-4 py-3 text-sm text-gray-700 whitespace-nowrap">
               {{ if .IsActive }}
                 <span class="bg-green-100 text-green-700 text-xs px-2 py-1 rounded-md">{{ t "service_type.active_yes" }}</span>
               {{ else }}

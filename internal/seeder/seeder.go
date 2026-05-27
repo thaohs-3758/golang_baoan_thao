@@ -20,6 +20,10 @@ func SeedDatabase(db *gorm.DB) error {
 		return fmt.Errorf("error seeding departments: %w", err)
 	}
 
+	if err := seedCategories(db); err != nil {
+		return fmt.Errorf("error seeding categories: %w", err)
+	}
+
 	if err := seedServiceTypes(db); err != nil {
 		return fmt.Errorf("error seeding service types: %w", err)
 	}
@@ -60,6 +64,12 @@ func findServiceByCode(db *gorm.DB, code string) (models.ServiceType, error) {
 	var s models.ServiceType
 	err := db.Where("code = ?", code).First(&s).Error
 	return s, err
+}
+
+func findCategoryByCode(db *gorm.DB, code string) (models.Category, error) {
+	var c models.Category
+	err := db.Where("code = ?", code).First(&c).Error
+	return c, err
 }
 
 func seedUsers(db *gorm.DB) error {
@@ -146,7 +156,7 @@ func seedDepartments(db *gorm.DB) error {
 
 	departments := []models.Department{
 		{
-			Name:         "Ph�ng C?p Gi?y T? T�y Th�n",
+			Name:         "Phòng Cấp Giấy Tờ Tùy Thân",
 			Code:         "PGTT",
 			Address:      "123 Đường Lê Lợi, Quận 1, TP. Hồ Chí Minh",
 			LeaderUserID: &staff1.ID,
@@ -195,6 +205,30 @@ func seedDepartments(db *gorm.DB) error {
 	return nil
 }
 
+func seedCategories(db *gorm.DB) error {
+	categories := []models.Category{
+		{Code: "GTTT", Name: "Giấy tờ tùy thân", Description: "Các dịch vụ cấp và đổi giấy tờ tùy thân (CCCD, hộ chiếu...)", IsActive: true},
+		{Code: "GPLX", Name: "Giấy phép lái xe", Description: "Cấp mới và gia hạn giấy phép lái xe các hạng", IsActive: true},
+		{Code: "DKXCG", Name: "Đăng ký xe cơ giới", Description: "Đăng ký xe máy, ô tô và phương tiện cơ giới", IsActive: true},
+		{Code: "KDTM", Name: "Kinh doanh & Thương mại", Description: "Đăng ký, gia hạn giấy phép kinh doanh", IsActive: true},
+		{Code: "HOTIC", Name: "Hộ tịch", Description: "Đăng ký khai sinh, kết hôn, khai tử và các sự kiện hộ tịch", IsActive: true},
+		{Code: "YTE", Name: "Y tế & Sức khỏe", Description: "Đăng ký khám chữa bệnh và dịch vụ y tế công lập", IsActive: true},
+		{Code: "GIAODUC", Name: "Giáo dục & Đào tạo", Description: "Đăng ký nhập học, tuyển sinh trường công lập", IsActive: true},
+		{Code: "LDXH", Name: "Lao động & Xã hội", Description: "Trợ cấp thất nghiệp, bảo hiểm xã hội và phúc lợi", IsActive: true},
+	}
+
+	for i := range categories {
+		categories[i].CreatedAt = time.Now()
+		categories[i].UpdatedAt = time.Now()
+		if err := db.Where("code = ?", categories[i].Code).FirstOrCreate(&categories[i]).Error; err != nil {
+			return err
+		}
+	}
+
+	fmt.Println("✓ Categories seeded")
+	return nil
+}
+
 func seedServiceTypes(db *gorm.DB) error {
 	deptGTTT, err := findDeptByCode(db, "PGTT")
 	if err != nil {
@@ -219,6 +253,39 @@ func seedServiceTypes(db *gorm.DB) error {
 	deptLD, err := findDeptByCode(db, "PLDTB")
 	if err != nil {
 		return fmt.Errorf("lookup dept PLDTB: %w", err)
+	}
+
+	catGTTT, err := findCategoryByCode(db, "GTTT")
+	if err != nil {
+		return fmt.Errorf("lookup category GTTT: %w", err)
+	}
+	catGPLX, err := findCategoryByCode(db, "GPLX")
+	if err != nil {
+		return fmt.Errorf("lookup category GPLX: %w", err)
+	}
+	catDKXCG, err := findCategoryByCode(db, "DKXCG")
+	if err != nil {
+		return fmt.Errorf("lookup category DKXCG: %w", err)
+	}
+	catKDTM, err := findCategoryByCode(db, "KDTM")
+	if err != nil {
+		return fmt.Errorf("lookup category KDTM: %w", err)
+	}
+	catHOTIC, err := findCategoryByCode(db, "HOTIC")
+	if err != nil {
+		return fmt.Errorf("lookup category HOTIC: %w", err)
+	}
+	catYTE, err := findCategoryByCode(db, "YTE")
+	if err != nil {
+		return fmt.Errorf("lookup category YTE: %w", err)
+	}
+	catGD, err := findCategoryByCode(db, "GIAODUC")
+	if err != nil {
+		return fmt.Errorf("lookup category GIAODUC: %w", err)
+	}
+	catLDXH, err := findCategoryByCode(db, "LDXH")
+	if err != nil {
+		return fmt.Errorf("lookup category LDXH: %w", err)
 	}
 
 	schemaID, _ := json.Marshal(map[string]interface{}{
@@ -270,101 +337,101 @@ func seedServiceTypes(db *gorm.DB) error {
 	serviceTypes := []models.ServiceType{
 		{
 			Name: "Cấp CCCD lần đầu", Code: "CCCD_NEW",
-			Description:       "Cấp Căn cước công dân lần đầu cho công dân đủ 14 tuổi",
-			RequiredDocuments: "Giấy khai sinh, Chứng minh thư hoặc Hộ chiếu, Ảnh màu 3x4",
-			FormSchema:        schemaID, ProcessingTime: intPtr(3), Fee: 0,
-			ResponsibleDepartmentID: &deptGTTT.ID, IsActive: true,
+			Description:             "Cấp Căn cước công dân lần đầu cho công dân đủ 14 tuổi",
+			RequiredDocuments:       "Giấy khai sinh, Chứng minh thư hoặc Hộ chiếu, Ảnh màu 3x4",
+			FormSchema:              schemaID, ProcessingTime: intPtr(3), Fee: 0,
+			CategoryID: &catGTTT.ID, ResponsibleDepartmentID: &deptGTTT.ID, IsActive: true,
 		},
 		{
 			Name: "Đổi CCCD (cập nhật thông tin)", Code: "CCCD_RENEW",
-			Description:       "Đổi Căn cước công dân do thay đổi thông tin cá nhân",
-			RequiredDocuments: "CCCD cũ, Giấy tờ chứng minh thay đổi thông tin",
-			FormSchema:        schemaID, ProcessingTime: intPtr(5), Fee: 50000,
-			ResponsibleDepartmentID: &deptGTTT.ID, IsActive: true,
+			Description:             "Đổi Căn cước công dân do thay đổi thông tin cá nhân",
+			RequiredDocuments:       "CCCD cũ, Giấy tờ chứng minh thay đổi thông tin",
+			FormSchema:              schemaID, ProcessingTime: intPtr(5), Fee: 50000,
+			CategoryID: &catGTTT.ID, ResponsibleDepartmentID: &deptGTTT.ID, IsActive: true,
 		},
 		{
 			Name: "Cấp Giấy phép lái xe hạng A", Code: "LICENSE_CLASS_A",
-			Description:       "Cấp Giấy phép lái xe hạng A (xe máy)",
-			RequiredDocuments: "CCCD/Hộ chiếu, Giấy chứng nhận sức khỏe, 4 ảnh 3x4",
-			FormSchema:        schemaLicense, ProcessingTime: intPtr(5), Fee: 70000,
-			ResponsibleDepartmentID: &deptXCG.ID, IsActive: true,
+			Description:             "Cấp Giấy phép lái xe hạng A (xe máy)",
+			RequiredDocuments:       "CCCD/Hộ chiếu, Giấy chứng nhận sức khỏe, 4 ảnh 3x4",
+			FormSchema:              schemaLicense, ProcessingTime: intPtr(5), Fee: 70000,
+			CategoryID: &catGPLX.ID, ResponsibleDepartmentID: &deptXCG.ID, IsActive: true,
 		},
 		{
 			Name: "Cấp Giấy phép lái xe hạng C", Code: "LICENSE_CLASS_C",
-			Description:       "Cấp Giấy phép lái xe hạng C (ô tô nhỏ)",
-			RequiredDocuments: "CCCD/Hộ chiếu, Giấy chứng nhận sức khỏe, 4 ảnh 3x4",
-			FormSchema:        schemaLicense, ProcessingTime: intPtr(7), Fee: 150000,
-			ResponsibleDepartmentID: &deptXCG.ID, IsActive: true,
+			Description:             "Cấp Giấy phép lái xe hạng C (ô tô nhỏ)",
+			RequiredDocuments:       "CCCD/Hộ chiếu, Giấy chứng nhận sức khỏe, 4 ảnh 3x4",
+			FormSchema:              schemaLicense, ProcessingTime: intPtr(7), Fee: 150000,
+			CategoryID: &catGPLX.ID, ResponsibleDepartmentID: &deptXCG.ID, IsActive: true,
 		},
 		{
 			Name: "Cấp Giấy phép lái xe hạng B", Code: "LICENSE_CLASS_B",
-			Description:       "Cấp Giấy phép lái xe hạng B (ô tô dưới 9 chỗ)",
-			RequiredDocuments: "CCCD/Hộ chiếu, Giấy chứng nhận sức khỏe, 4 ảnh 3x4",
-			FormSchema:        schemaLicense, ProcessingTime: intPtr(7), Fee: 135000,
-			ResponsibleDepartmentID: &deptGPLX.ID, IsActive: true,
+			Description:             "Cấp Giấy phép lái xe hạng B (ô tô dưới 9 chỗ)",
+			RequiredDocuments:       "CCCD/Hộ chiếu, Giấy chứng nhận sức khỏe, 4 ảnh 3x4",
+			FormSchema:              schemaLicense, ProcessingTime: intPtr(7), Fee: 135000,
+			CategoryID: &catGPLX.ID, ResponsibleDepartmentID: &deptGPLX.ID, IsActive: true,
 		},
 		{
 			Name: "Đăng ký xe máy", Code: "REGISTER_BIKE",
 			Description:       "Đăng ký xe máy tại Cục Đăng ký Lái xe và Xe cơ giới",
 			RequiredDocuments: "Hóa đơn bán hàng, CCCD, Bảng kiểm tra kỹ thuật",
 			FormSchema:        schemaBike, ProcessingTime: intPtr(1), Fee: 50000,
-			IsActive: true,
+			CategoryID: &catDKXCG.ID, ResponsibleDepartmentID: &deptXCG.ID, IsActive: true,
 		},
 		{
 			Name: "Đăng ký xe ô tô", Code: "REGISTER_CAR",
 			Description:       "Đăng ký xe ô tô tại Cục Đăng ký Lái xe và Xe cơ giới",
 			RequiredDocuments: "Hóa đơn bán hàng, CCCD, Bảng kiểm tra kỹ thuật, Bảo hiểm",
 			FormSchema:        schemaBike, ProcessingTime: intPtr(3), Fee: 100000,
-			IsActive: true,
+			CategoryID: &catDKXCG.ID, ResponsibleDepartmentID: &deptXCG.ID, IsActive: true,
 		},
 		{
 			Name: "Đăng ký nhập học trường công lập", Code: "EDU_ENROLL",
 			Description:       "Đăng ký nhập học cho học sinh vào trường tiểu học và trung học công lập",
 			RequiredDocuments: "Giấy khai sinh, Hộ khẩu hoặc Giấy xác nhận cư trú, Ảnh 3x4",
 			FormSchema:        schemaEdu, ProcessingTime: intPtr(2), Fee: 0,
-			IsActive: true,
+			CategoryID: &catGD.ID, IsActive: true,
 		},
 		{
 			Name: "Đăng ký khám sức khỏe định kỳ", Code: "HEALTH_CHECK",
 			Description:       "Đăng ký dịch vụ khám sức khỏe định kỳ tại cơ sở y tế công lập",
 			RequiredDocuments: "CCCD, Thẻ bảo hiểm y tế",
 			FormSchema:        schemaHealth, ProcessingTime: intPtr(1), Fee: 30000,
-			IsActive: true,
+			CategoryID: &catYTE.ID, IsActive: true,
 		},
 		{
 			Name: "Đăng ký kinh doanh hộ cá thể", Code: "BIZ_REGISTER",
-			Description:       "Đăng ký kinh doanh hộ cá thể và cấp giấy phép kinh doanh",
-			RequiredDocuments: "CCCD, Hộ khẩu, Đơn đăng ký kinh doanh, Hợp đồng thuê mặt bằng",
-			FormSchema:        schemaBiz, ProcessingTime: intPtr(5), Fee: 200000,
-			ResponsibleDepartmentID: &deptKD.ID, IsActive: true,
+			Description:             "Đăng ký kinh doanh hộ cá thể và cấp giấy phép kinh doanh",
+			RequiredDocuments:       "CCCD, Hộ khẩu, Đơn đăng ký kinh doanh, Hợp đồng thuê mặt bằng",
+			FormSchema:              schemaBiz, ProcessingTime: intPtr(5), Fee: 200000,
+			CategoryID: &catKDTM.ID, ResponsibleDepartmentID: &deptKD.ID, IsActive: true,
 		},
 		{
 			Name: "Gia hạn giấy phép kinh doanh", Code: "BIZ_RENEW",
-			Description:       "Gia hạn giấy phép kinh doanh hộ cá thể",
-			RequiredDocuments: "CCCD, Giấy phép kinh doanh cũ, Biên lai nộp thuế",
-			FormSchema:        schemaBiz, ProcessingTime: intPtr(3), Fee: 100000,
-			ResponsibleDepartmentID: &deptKD.ID, IsActive: true,
+			Description:             "Gia hạn giấy phép kinh doanh hộ cá thể",
+			RequiredDocuments:       "CCCD, Giấy phép kinh doanh cũ, Biên lai nộp thuế",
+			FormSchema:              schemaBiz, ProcessingTime: intPtr(3), Fee: 100000,
+			CategoryID: &catKDTM.ID, ResponsibleDepartmentID: &deptKD.ID, IsActive: true,
 		},
 		{
 			Name: "Đăng ký kết hôn", Code: "MARRIAGE_REG",
-			Description:       "Đăng ký kết hôn tại cơ quan hộ tịch",
-			RequiredDocuments: "CCCD hai bên, Giấy xác nhận tình trạng hôn nhân, Ảnh 4x6",
-			FormSchema:        schemaMarriage, ProcessingTime: intPtr(5), Fee: 0,
-			ResponsibleDepartmentID: &deptTP.ID, IsActive: true,
+			Description:             "Đăng ký kết hôn tại cơ quan hộ tịch",
+			RequiredDocuments:       "CCCD hai bên, Giấy xác nhận tình trạng hôn nhân, Ảnh 4x6",
+			FormSchema:              schemaMarriage, ProcessingTime: intPtr(5), Fee: 0,
+			CategoryID: &catHOTIC.ID, ResponsibleDepartmentID: &deptTP.ID, IsActive: true,
 		},
 		{
 			Name: "Đăng ký khai sinh", Code: "BIRTH_REG",
-			Description:       "Đăng ký khai sinh cho trẻ em",
-			RequiredDocuments: "CCCD bố/mẹ, Giấy chứng sinh, Hộ khẩu gia đình",
-			FormSchema:        schemaBirth, ProcessingTime: intPtr(3), Fee: 0,
-			ResponsibleDepartmentID: &deptTP.ID, IsActive: true,
+			Description:             "Đăng ký khai sinh cho trẻ em",
+			RequiredDocuments:       "CCCD bố/mẹ, Giấy chứng sinh, Hộ khẩu gia đình",
+			FormSchema:              schemaBirth, ProcessingTime: intPtr(3), Fee: 0,
+			CategoryID: &catHOTIC.ID, ResponsibleDepartmentID: &deptTP.ID, IsActive: true,
 		},
 		{
 			Name: "Trợ cấp thất nghiệp", Code: "UNEMPLOYMENT",
-			Description:       "Đăng ký hưởng trợ cấp thất nghiệp",
-			RequiredDocuments: "CCCD, Quyết định thôi việc, Sổ bảo hiểm xã hội",
-			FormSchema:        schemaJob, ProcessingTime: intPtr(10), Fee: 0,
-			ResponsibleDepartmentID: &deptLD.ID, IsActive: true,
+			Description:             "Đăng ký hưởng trợ cấp thất nghiệp",
+			RequiredDocuments:       "CCCD, Quyết định thôi việc, Sổ bảo hiểm xã hội",
+			FormSchema:              schemaJob, ProcessingTime: intPtr(10), Fee: 0,
+			CategoryID: &catLDXH.ID, ResponsibleDepartmentID: &deptLD.ID, IsActive: true,
 		},
 	}
 
