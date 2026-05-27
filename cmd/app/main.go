@@ -115,7 +115,10 @@ func main() {
 
 	importExportSvc := services.NewImportExportService(db, departmentRepo, userRepo, citizenProfileRepo, serviceCatalogRepo, staffProfileRepo)
 	adminCitizenHandler := handlers.NewAdminCitizenHandler(citizenProfileRepo, importExportSvc)
-	adminUserHandler = adminUserHandler.WithImportExport(importExportSvc).WithDeptAndStaffRepos(departmentRepo, staffProfileRepo)
+	adminUserHandler = adminUserHandler.
+		WithImportExport(importExportSvc).
+		WithDeptAndStaffRepos(departmentRepo, staffProfileRepo).
+		WithCitizenProfileRepo(citizenProfileRepo)
 	adminDepartmentHandler = adminDepartmentHandler.WithImportExport(importExportSvc)
 	serviceCatalogHandler = serviceCatalogHandler.WithImportExport(importExportSvc)
 

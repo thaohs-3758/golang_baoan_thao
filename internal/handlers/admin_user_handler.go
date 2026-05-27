@@ -30,11 +30,16 @@ type StaffImportExportService interface {
 	ImportStaff(rows []services.StaffImportRow, createdBy string) []string
 }
 
+type AdminCitizenProfileLookup interface {
+	GetByUserID(userID string) (*models.CitizenProfile, error)
+}
+
 type AdminUserHandler struct {
-	svc       AdminUserService
-	importSvc StaffImportExportService
-	deptRepo  repositories.DepartmentRepository
-	staffRepo repositories.StaffProfileRepository
+	svc                AdminUserService
+	importSvc          StaffImportExportService
+	deptRepo           repositories.DepartmentRepository
+	staffRepo          repositories.StaffProfileRepository
+	citizenProfileRepo AdminCitizenProfileLookup
 }
 
 func NewAdminUserHandler(svc AdminUserService) *AdminUserHandler {
@@ -49,6 +54,11 @@ func (h *AdminUserHandler) WithImportExport(svc StaffImportExportService) *Admin
 func (h *AdminUserHandler) WithDeptAndStaffRepos(deptRepo repositories.DepartmentRepository, staffRepo repositories.StaffProfileRepository) *AdminUserHandler {
 	h.deptRepo = deptRepo
 	h.staffRepo = staffRepo
+	return h
+}
+
+func (h *AdminUserHandler) WithCitizenProfileRepo(profileRepo AdminCitizenProfileLookup) *AdminUserHandler {
+	h.citizenProfileRepo = profileRepo
 	return h
 }
 
@@ -153,11 +163,17 @@ func (h *AdminUserHandler) ShowUser(c *echo.Context) error {
 		return c.Redirect(http.StatusSeeOther, adminFlashURL("error", configs.T(c, "auth.user_not_found", nil)))
 	}
 
+	var citizenProfile *models.CitizenProfile
+	if user != nil && user.Role == models.UserRoleCitizen && h.citizenProfileRepo != nil {
+		citizenProfile, _ = h.citizenProfileRepo.GetByUserID(user.ID)
+	}
+
 	data := map[string]interface{}{
-		"Title":       configs.T(c, "ui.users.detail.title", nil),
-		"CurrentPath": "/admin/users",
-		"CurrentUser": adminCurrentUser(c),
-		"User":        user,
+		"Title":          configs.T(c, "ui.users.detail.title", nil),
+		"CurrentPath":    "/admin/users",
+		"CurrentUser":    adminCurrentUser(c),
+		"User":           user,
+		"CitizenProfile": citizenProfile,
 	}
 	return c.Render(http.StatusOK, "admin/pages/users/detail.html", data)
 }

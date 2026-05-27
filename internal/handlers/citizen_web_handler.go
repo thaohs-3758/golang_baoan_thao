@@ -26,17 +26,18 @@ type citizenNotificationSvc interface {
 	CountUnread(userID string) (int64, error)
 }
 
-type citizenProfileWebSvc interface {
-	GetProfile(userID string) (*dtos.CitizenProfileResponse, error)
-	UpdateProfile(userID string, req *dtos.UpdateCitizenProfileRequest) (*dtos.CitizenProfileResponse, error)
-}
-
 type citizenAppSvc interface {
 	SubmitApplication(citizenUserID string, req *dtos.SubmitApplicationRequest, files []*multipart.FileHeader) (*dtos.ApplicationResponse, error)
 	ListMyApplications(userID string, page, limit int) ([]models.Application, int64, error)
 	GetMyApplication(userID, appID string) (*dtos.ApplicationResponse, error)
 	ListMyApplicationStatusHistory(userID, appID string, page, limit int, since *time.Time) ([]models.ApplicationStatusLog, int64, error)
 	UploadMyApplicationSupplements(userID, appID string, files []*multipart.FileHeader) ([]dtos.ApplicationAttachmentResponse, error)
+}
+
+type citizenProfileWebSvc interface {
+	GetProfile(userID string) (*dtos.CitizenProfileResponse, error)
+	UpdateProfile(userID string, req *dtos.UpdateCitizenProfileRequest) (*dtos.CitizenProfileResponse, error)
+	ChangeMyPassword(userID string, req *dtos.ChangeMyPasswordRequest) error
 }
 
 type CitizenWebHandler struct {
@@ -316,6 +317,144 @@ func (h *CitizenWebHandler) ShowDashboard(c *echo.Context) error {
 	return c.Render(http.StatusOK, "citizen/pages/dashboard.html", data)
 }
 
+func (h *CitizenWebHandler) ShowProfilePage(c *echo.Context) error {
+	claims := citizenCurrentUser(c)
+	if claims == nil || h.profileSvc == nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "common.internal_error")
+	}
+
+	profile, err := h.profileSvc.GetProfile(claims.ID)
+	if err != nil {
+		if errors.Is(err, services.ErrProfileNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "profile.not_found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, "common.internal_error")
+	}
+
+	return c.Render(http.StatusOK, "citizen/pages/profile/index.html", map[string]interface{}{
+		"Title":       configs.T(c, "ui.profile.title", nil),
+		"CurrentPath": "/citizen/profile",
+		"CurrentUser": claims,
+		"UnreadCount": h.unreadCount(claims.ID),
+		"Profile":     profile,
+		"Flash":       flashFromQuery(c),
+		"CSRFToken":   h.csrfToken(c),
+	})
+}
+
+func (h *CitizenWebHandler) UpdateProfile(c *echo.Context) error {
+	claims := citizenCurrentUser(c)
+	if claims == nil || h.profileSvc == nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "common.internal_error")
+	}
+
+	phone := strings.TrimSpace(c.FormValue("phone"))
+	address := strings.TrimSpace(c.FormValue("address"))
+	gender := normalizeCitizenGender(c.FormValue("gender"))
+	permanentAddress := strings.TrimSpace(c.FormValue("permanent_address"))
+	dateOfBirthInput := strings.TrimSpace(c.FormValue("date_of_birth"))
+
+	var dateOfBirth *time.Time
+	if dateOfBirthInput != "" {
+		parsedDOB, err := time.Parse("2006-01-02", dateOfBirthInput)
+		if err != nil {
+			return c.Render(http.StatusUnprocessableEntity, "citizen/pages/profile/index.html", map[string]interface{}{
+				"Title":                configs.T(c, "ui.profile.title", nil),
+				"CurrentPath":          "/citizen/profile",
+				"CurrentUser":          claims,
+				"UnreadCount":          h.unreadCount(claims.ID),
+				"FormPhone":            phone,
+				"FormAddress":          address,
+				"FormGender":           gender,
+				"FormPermanentAddress": permanentAddress,
+				"FormDateOfBirth":      dateOfBirthInput,
+				"Error":                configs.T(c, "profile.invalid_request", nil),
+				"CSRFToken":            h.csrfToken(c),
+			})
+		}
+		dateOfBirth = &parsedDOB
+	}
+
+	req := &dtos.UpdateCitizenProfileRequest{
+		Phone:            &phone,
+		Address:          &address,
+		Gender:           &gender,
+		PermanentAddress: &permanentAddress,
+		DateOfBirth:      dateOfBirth,
+	}
+
+	profile, err := h.profileSvc.UpdateProfile(claims.ID, req)
+	if err != nil {
+		msg := configs.T(c, "common.internal_error", nil)
+		if errors.Is(err, services.ErrProfileNotFound) {
+			msg = configs.T(c, "profile.not_found", nil)
+		}
+		return c.Render(http.StatusUnprocessableEntity, "citizen/pages/profile/index.html", map[string]interface{}{
+			"Title":                configs.T(c, "ui.profile.title", nil),
+			"CurrentPath":          "/citizen/profile",
+			"CurrentUser":          claims,
+			"UnreadCount":          h.unreadCount(claims.ID),
+			"Profile":              profile,
+			"FormPhone":            phone,
+			"FormAddress":          address,
+			"FormGender":           gender,
+			"FormPermanentAddress": permanentAddress,
+			"FormDateOfBirth":      dateOfBirthInput,
+			"Error":                msg,
+			"CSRFToken":            h.csrfToken(c),
+		})
+	}
+
+	return c.Redirect(http.StatusSeeOther, flashURL("/citizen/profile", "success", configs.T(c, "ui.msg.profile_updated", nil)))
+}
+
+func (h *CitizenWebHandler) ChangePassword(c *echo.Context) error {
+	claims := citizenCurrentUser(c)
+	if claims == nil || h.profileSvc == nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "common.internal_error")
+	}
+
+	req := &dtos.ChangeMyPasswordRequest{
+		CurrentPassword:    strings.TrimSpace(c.FormValue("current_password")),
+		NewPassword:        strings.TrimSpace(c.FormValue("new_password")),
+		ConfirmNewPassword: strings.TrimSpace(c.FormValue("confirm_new_password")),
+	}
+	if err := c.Validate(req); err != nil {
+		return c.Render(http.StatusUnprocessableEntity, "citizen/pages/profile/index.html", map[string]interface{}{
+			"Title":       configs.T(c, "ui.profile.title", nil),
+			"CurrentPath": "/citizen/profile",
+			"CurrentUser": claims,
+			"UnreadCount": h.unreadCount(claims.ID),
+			"Error":       configs.T(c, "auth.invalid_request", nil),
+			"CSRFToken":   h.csrfToken(c),
+		})
+	}
+
+	if err := h.profileSvc.ChangeMyPassword(claims.ID, req); err != nil {
+		msg := configs.T(c, "common.internal_error", nil)
+		switch {
+		case errors.Is(err, services.ErrPasswordMismatch):
+			msg = configs.T(c, "auth.password_mismatch", nil)
+		case errors.Is(err, services.ErrPasswordConfirmationMismatch):
+			msg = configs.T(c, "auth.password_confirmation_mismatch", nil)
+		case errors.Is(err, services.ErrNewPasswordMustDiffer):
+			msg = configs.T(c, "auth.new_password_must_differ", nil)
+		case errors.Is(err, services.ErrProfileNotFound):
+			msg = configs.T(c, "profile.not_found", nil)
+		}
+		return c.Render(http.StatusUnprocessableEntity, "citizen/pages/profile/index.html", map[string]interface{}{
+			"Title":       configs.T(c, "ui.profile.title", nil),
+			"CurrentPath": "/citizen/profile",
+			"CurrentUser": claims,
+			"UnreadCount": h.unreadCount(claims.ID),
+			"Error":       msg,
+			"CSRFToken":   h.csrfToken(c),
+		})
+	}
+
+	return c.Redirect(http.StatusSeeOther, flashURL("/citizen/profile", "success", configs.T(c, "profile.password_changed", nil)))
+}
+
 func (h *CitizenWebHandler) ListNotifications(c *echo.Context) error {
 	claims := citizenCurrentUser(c)
 	if claims == nil || h.notificationSvc == nil {
@@ -348,17 +487,17 @@ func (h *CitizenWebHandler) ListNotifications(c *echo.Context) error {
 	}
 
 	data := map[string]interface{}{
-		"Title":                  configs.T(c, "ui.nav.citizen.notifications", nil),
-		"CurrentPath":            "/citizen/notifications",
-		"CurrentUser":            claims,
-		"UnreadCount":            h.unreadCount(claims.ID),
-		"Notifications":          items,
-		"Pagination":             utils.NewPagination(page, limit, total),
-		"FilterIsRead":           filterRead,
-		"FilterType":             filterType,
-		"Flash":                  flashFromQuery(c),
-		"CSRFToken":              h.csrfToken(c),
-		"EmailNotifEnabled":      emailNotifEnabled,
+		"Title":             configs.T(c, "ui.nav.citizen.notifications", nil),
+		"CurrentPath":       "/citizen/notifications",
+		"CurrentUser":       claims,
+		"UnreadCount":       h.unreadCount(claims.ID),
+		"Notifications":     items,
+		"Pagination":        utils.NewPagination(page, limit, total),
+		"FilterIsRead":      filterRead,
+		"FilterType":        filterType,
+		"Flash":             flashFromQuery(c),
+		"CSRFToken":         h.csrfToken(c),
+		"EmailNotifEnabled": emailNotifEnabled,
 	}
 	return c.Render(http.StatusOK, "citizen/pages/notifications/list.html", data)
 }
@@ -755,4 +894,14 @@ func isAllDigits(s string) bool {
 		}
 	}
 	return true
+}
+
+func normalizeCitizenGender(raw string) string {
+	v := strings.ToLower(strings.TrimSpace(raw))
+	switch v {
+	case "male", "female", "other":
+		return v
+	default:
+		return ""
+	}
 }

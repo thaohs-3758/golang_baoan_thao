@@ -14,6 +14,8 @@ type CitizenExportRow struct {
 	SoDienThoai string
 	DiaChi    string
 	NgaySinh  string
+	GioiTinh  string
+	DiaChiThuongTru string
 	TongHoSo  int64
 }
 
@@ -71,6 +73,8 @@ func (r *citizenProfileRepo) ListAllForExport(offset, limit int) ([]CitizenExpor
 		SoDienThoai string
 		DiaChi      string
 		NgaySinh    string
+		GioiTinh    string
+		DiaChiThuongTru string
 		TongHoSo    int64
 	}
 
@@ -90,11 +94,13 @@ func (r *citizenProfileRepo) ListAllForExport(offset, limit int) ([]CitizenExpor
 			u.phone AS so_dien_thoai,
 			u.address AS dia_chi,
 			COALESCE(TO_CHAR(cp.date_of_birth, 'DD/MM/YYYY'), '') AS ngay_sinh,
+			COALESCE(cp.gender, '') AS gioi_tinh,
+			COALESCE(cp.permanent_address, '') AS dia_chi_thuong_tru,
 			COUNT(a.id) AS tong_ho_so`).
 		Joins("JOIN users u ON u.id = cp.user_id AND u.deleted_at IS NULL").
 		Joins("LEFT JOIN applications a ON a.citizen_user_id = cp.user_id AND a.deleted_at IS NULL").
 		Where("cp.deleted_at IS NULL").
-		Group("cp.citizen_id_number, u.name, u.email, u.phone, u.address, cp.date_of_birth").
+		Group("cp.citizen_id_number, u.name, u.email, u.phone, u.address, cp.date_of_birth, cp.gender, cp.permanent_address").
 		Order("u.name ASC").
 		Offset(offset).Limit(limit).
 		Scan(&rows).Error
@@ -111,6 +117,8 @@ func (r *citizenProfileRepo) ListAllForExport(offset, limit int) ([]CitizenExpor
 			SoDienThoai: r.SoDienThoai,
 			DiaChi:      r.DiaChi,
 			NgaySinh:    r.NgaySinh,
+			GioiTinh:    r.GioiTinh,
+			DiaChiThuongTru: r.DiaChiThuongTru,
 			TongHoSo:    r.TongHoSo,
 		}
 	}

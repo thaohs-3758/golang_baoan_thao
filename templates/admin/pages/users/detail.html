@@ -1,4 +1,4 @@
-{{ template "admin/partials/head.html" . }}
+﻿{{ template "admin/partials/head.html" . }}
 <div class="flex h-screen overflow-hidden">
   {{ template "admin/partials/sidebar.html" . }}
   <div class="flex-1 flex flex-col overflow-hidden">
@@ -61,7 +61,7 @@
             </div>
             <div>
               <p class="text-xs font-medium text-gray-500 uppercase">{{ t "ui.users.form.phone" }}</p>
-              <p class="mt-1 text-sm text-gray-900">{{ if .User.Phone }}{{ .User.Phone }}{{ else }}<span class="text-gray-400">—</span>{{ end }}</p>
+              <p class="mt-1 text-sm text-gray-900">{{ if .User.Phone }}{{ .User.Phone }}{{ else }}<span class="text-gray-400">â€”</span>{{ end }}</p>
             </div>
             <div>
               <p class="text-xs font-medium text-gray-500 uppercase">{{ t "ui.users.detail.last_login" }}</p>
@@ -71,8 +71,26 @@
             </div>
             <div class="col-span-2">
               <p class="text-xs font-medium text-gray-500 uppercase">{{ t "ui.users.form.address" }}</p>
-              <p class="mt-1 text-sm text-gray-900">{{ if .User.Address }}{{ .User.Address }}{{ else }}<span class="text-gray-400">—</span>{{ end }}</p>
+              <p class="mt-1 text-sm text-gray-900">{{ if .User.Address }}{{ .User.Address }}{{ else }}<span class="text-gray-400">â€”</span>{{ end }}</p>
             </div>
+            {{ if and (eq (printf "%s" .User.Role) "citizen") .CitizenProfile }}
+            <div>
+              <p class="text-xs font-medium text-gray-500 uppercase">{{ t "ui.profile.personal.date_of_birth" }}</p>
+              <p class="mt-1 text-sm text-gray-900">{{ if .CitizenProfile.DateOfBirth }}{{ .CitizenProfile.DateOfBirth.Format "2006-01-02" }}{{ else }}<span class="text-gray-400">â€”</span>{{ end }}</p>
+            </div>
+            <div>
+              <p class="text-xs font-medium text-gray-500 uppercase">{{ t "ui.profile.personal.gender" }}</p>
+              <p class="mt-1 text-sm text-gray-900">
+                {{ if .CitizenProfile.Gender }}
+                  {{ if eq .CitizenProfile.Gender "male" }}{{ t "ui.profile.personal.gender.male" }}{{ else if eq .CitizenProfile.Gender "female" }}{{ t "ui.profile.personal.gender.female" }}{{ else if eq .CitizenProfile.Gender "other" }}{{ t "ui.profile.personal.gender.other" }}{{ else }}{{ .CitizenProfile.Gender }}{{ end }}
+                {{ else }}<span class="text-gray-400">â€”</span>{{ end }}
+              </p>
+            </div>
+            <div class="col-span-2">
+              <p class="text-xs font-medium text-gray-500 uppercase">{{ t "ui.profile.personal.permanent_address" }}</p>
+              <p class="mt-1 text-sm text-gray-900">{{ if .CitizenProfile.PermanentAddress }}{{ .CitizenProfile.PermanentAddress }}{{ else }}<span class="text-gray-400">â€”</span>{{ end }}</p>
+            </div>
+            {{ end }}
             <div>
               <p class="text-xs font-medium text-gray-500 uppercase">{{ t "ui.users.detail.created_at" }}</p>
               <p class="mt-1 text-sm text-gray-900">{{ .User.CreatedAt }}</p>
@@ -125,3 +143,4 @@
 </div>
 {{ template "admin/partials/confirm-modal.html" . }}
 {{ template "admin/partials/foot.html" . }}
+

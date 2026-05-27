@@ -91,6 +91,55 @@ func (f *fakeAppWebSvc) UploadMyApplicationSupplements(uid, appID string, files 
 	return nil, nil
 }
 
+type fakeCitizenProfileWebSvc struct {
+	getFn    func(userID string) (*dtos.CitizenProfileResponse, error)
+	updateFn func(userID string, req *dtos.UpdateCitizenProfileRequest) (*dtos.CitizenProfileResponse, error)
+	passFn   func(userID string, req *dtos.ChangeMyPasswordRequest) error
+}
+
+func (f *fakeCitizenProfileWebSvc) GetProfile(userID string) (*dtos.CitizenProfileResponse, error) {
+	if f.getFn != nil {
+		return f.getFn(userID)
+	}
+	return &dtos.CitizenProfileResponse{
+		UserID:          userID,
+		Name:            "Citizen A",
+		Email:           "citizen@test.com",
+		Phone:           "0900000000",
+		Address:         "HCM",
+		CitizenIDNumber: "012345678901",
+	}, nil
+}
+
+func (f *fakeCitizenProfileWebSvc) UpdateProfile(userID string, req *dtos.UpdateCitizenProfileRequest) (*dtos.CitizenProfileResponse, error) {
+	if f.updateFn != nil {
+		return f.updateFn(userID, req)
+	}
+	phone := ""
+	if req.Phone != nil {
+		phone = *req.Phone
+	}
+	address := ""
+	if req.Address != nil {
+		address = *req.Address
+	}
+	return &dtos.CitizenProfileResponse{
+		UserID:          userID,
+		Name:            "Citizen A",
+		Email:           "citizen@test.com",
+		Phone:           phone,
+		Address:         address,
+		CitizenIDNumber: "012345678901",
+	}, nil
+}
+
+func (f *fakeCitizenProfileWebSvc) ChangeMyPassword(userID string, req *dtos.ChangeMyPasswordRequest) error {
+	if f.passFn != nil {
+		return f.passFn(userID, req)
+	}
+	return nil
+}
+
 // --- helpers ---
 
 func newCitizenCtx(e *echo.Echo, method, target string) (*echo.Context, *httptest.ResponseRecorder) {
@@ -172,6 +221,95 @@ func TestShowApplicationsList_RendersListPage(t *testing.T) {
 	}
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestShowProfilePage_RendersProfile(t *testing.T) {
+	_ = configs.LoadI18nMessages("../../locales")
+	e := newAdminEcho()
+	h := NewCitizenWebHandler(&fakeAuthService{}).WithProfileService(&fakeCitizenProfileWebSvc{})
+
+	c, rec := newCitizenCtx(e, http.MethodGet, "/citizen/profile")
+	setCitizenUser(c, "u1")
+
+	if err := h.ShowProfilePage(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestUpdateProfile_RedirectsOnSuccess(t *testing.T) {
+	_ = configs.LoadI18nMessages("../../locales")
+	e := newAdminEcho()
+	h := NewCitizenWebHandler(&fakeAuthService{}).WithProfileService(&fakeCitizenProfileWebSvc{})
+
+	req := httptest.NewRequest(http.MethodPost, "/citizen/profile", strings.NewReader("phone=0911&address=HN"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	setCitizenUser(c, "u1")
+
+	if err := h.UpdateProfile(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("expected 303, got %d", rec.Code)
+	}
+}
+
+func TestUpdateProfile_PassesPersonalFieldsToService(t *testing.T) {
+	_ = configs.LoadI18nMessages("../../locales")
+	e := newAdminEcho()
+	var capturedReq *dtos.UpdateCitizenProfileRequest
+	h := NewCitizenWebHandler(&fakeAuthService{}).WithProfileService(&fakeCitizenProfileWebSvc{
+		updateFn: func(userID string, req *dtos.UpdateCitizenProfileRequest) (*dtos.CitizenProfileResponse, error) {
+			capturedReq = req
+			return &dtos.CitizenProfileResponse{UserID: userID}, nil
+		},
+	})
+
+	form := "phone=0911&address=HN&gender=male&permanent_address=Quan+1&date_of_birth=1999-10-20"
+	req := httptest.NewRequest(http.MethodPost, "/citizen/profile", strings.NewReader(form))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	setCitizenUser(c, "u1")
+
+	if err := h.UpdateProfile(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if capturedReq == nil {
+		t.Fatal("expected profile update request to be captured")
+	}
+	if capturedReq.Gender == nil || *capturedReq.Gender != "male" {
+		t.Fatalf("expected gender=male, got %+v", capturedReq.Gender)
+	}
+	if capturedReq.PermanentAddress == nil || *capturedReq.PermanentAddress != "Quan 1" {
+		t.Fatalf("expected permanent_address='Quan 1', got %+v", capturedReq.PermanentAddress)
+	}
+	if capturedReq.DateOfBirth == nil || capturedReq.DateOfBirth.Format("2006-01-02") != "1999-10-20" {
+		t.Fatalf("expected date_of_birth=1999-10-20, got %+v", capturedReq.DateOfBirth)
+	}
+}
+
+func TestChangePassword_RedirectsOnSuccess(t *testing.T) {
+	_ = configs.LoadI18nMessages("../../locales")
+	e := newAdminEcho()
+	h := NewCitizenWebHandler(&fakeAuthService{}).WithProfileService(&fakeCitizenProfileWebSvc{})
+
+	req := httptest.NewRequest(http.MethodPost, "/citizen/profile/password", strings.NewReader("current_password=old12345&new_password=new12345&confirm_new_password=new12345"))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	setCitizenUser(c, "u1")
+
+	if err := h.ChangePassword(c); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("expected 303, got %d", rec.Code)
 	}
 }
 
