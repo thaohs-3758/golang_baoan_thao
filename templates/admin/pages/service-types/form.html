@@ -13,7 +13,7 @@
   {{ end }}
 
   <section class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-    <form method="post" action="{{ .Action }}" class="space-y-4">
+    <form method="post" action="{{ .Action }}" class="space-y-4" id="service-type-form">
       <div class="grid grid-cols-2 gap-4">
         <label class="grid gap-2">
           <span class="text-sm font-medium text-gray-700">{{ t "service_type.name" }}</span>
@@ -56,10 +56,36 @@
         <textarea name="required_documents" rows="3" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">{{ .ServiceType.RequiredDocuments }}</textarea>
       </label>
 
-      <label class="grid gap-2">
-        <span class="text-sm font-medium text-gray-700">{{ t "service_type.form_schema" }}</span>
-        <textarea name="form_schema" rows="6" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">{{ .ServiceType.FormSchema }}</textarea>
-      </label>
+      {{/* ── Form Builder ── */}}
+      <div class="grid gap-2">
+        <div class="flex items-center justify-between">
+          <div>
+            <span class="text-sm font-medium text-gray-700">{{ t "service_type.form_builder" }}</span>
+            <p class="text-xs text-gray-500 mt-0.5">{{ t "service_type.form_builder_subtitle" }}</p>
+          </div>
+        </div>
+
+        <div id="fb-fields" class="space-y-3"></div>
+
+        <button type="button" id="fb-add"
+                class="mt-1 flex items-center gap-1.5 rounded-md border border-dashed border-gray-300 px-3 py-2 text-sm text-gray-500 hover:border-indigo-400 hover:text-indigo-600">
+          <i data-lucide="plus" class="h-4 w-4"></i>
+          {{ t "service_type.fb.add_field" }}
+        </button>
+
+        <div id="fb-empty" class="rounded-lg border border-dashed border-gray-200 px-4 py-6 text-center text-sm text-gray-400">
+          {{ t "service_type.fb.empty" }}
+        </div>
+
+        {{/* Hidden textarea submitted with the form */}}
+        <textarea id="fb-json" name="form_schema" class="hidden">{{ .ServiceType.FormSchema }}</textarea>
+
+        {{/* Raw JSON preview (collapsed) */}}
+        <details class="mt-1">
+          <summary class="cursor-pointer text-xs text-gray-400 hover:text-gray-600">{{ t "service_type.fb.raw_json" }}</summary>
+          <pre id="fb-preview" class="mt-1 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 overflow-x-auto whitespace-pre-wrap"></pre>
+        </details>
+      </div>
 
       <div class="grid grid-cols-3 gap-4 items-end">
         <label class="grid gap-2">
@@ -83,6 +109,275 @@
     </form>
   </section>
 </div>
+
+<script>
+(function () {
+  // i18n strings injected from server (html/template JS-escapes values inside <script>)
+  const I18N = {
+    fieldN:      "{{ t "service_type.fb.field_n" }}",
+    key:         "{{ t "service_type.fb.key" }}",
+    keyHint:     "{{ t "service_type.fb.key_hint" }}",
+    type:        "{{ t "service_type.fb.type" }}",
+    required:    "{{ t "service_type.fb.required" }}",
+    tabVi:       "{{ t "service_type.fb.tab_vi" }}",
+    tabEn:       "{{ t "service_type.fb.tab_en" }}",
+    label:       "{{ t "service_type.fb.label" }}",
+    placeholder: "{{ t "service_type.fb.placeholder" }}",
+    helpText:    "{{ t "service_type.fb.help_text" }}",
+    options:     "{{ t "service_type.fb.options" }}",
+    remove:      "{{ t "service_type.fb.remove" }}",
+    types: {
+      text:     "{{ t "service_type.fb.type.text" }}",
+      textarea: "{{ t "service_type.fb.type.textarea" }}",
+      number:   "{{ t "service_type.fb.type.number" }}",
+      date:     "{{ t "service_type.fb.type.date" }}",
+      select:   "{{ t "service_type.fb.type.select" }}",
+      checkbox: "{{ t "service_type.fb.type.checkbox" }}",
+    }
+  };
+
+  const TYPES = ['text','textarea','number','date','select','checkbox'];
+
+  // State
+  let fields = [];
+
+  // Parse existing schema on load
+  try {
+    const raw = document.getElementById('fb-json').value.trim();
+    if (raw && raw !== '{}') {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed.fields) && parsed.fields.length > 0 && typeof parsed.fields[0] === 'object') {
+        fields = parsed.fields.map(f => ({
+          key:           f.key || '',
+          type:          f.type || 'text',
+          required:      !!f.required,
+          title_vi:      (f.title && f.title.vi) || '',
+          title_en:      (f.title && f.title.en) || '',
+          placeholder_vi:(f.placeholder && f.placeholder.vi) || '',
+          placeholder_en:(f.placeholder && f.placeholder.en) || '',
+          help_text_vi:  (f.help_text && f.help_text.vi) || '',
+          help_text_en:  (f.help_text && f.help_text.en) || '',
+          options_raw:   serializeOptions(f.options || []),
+          _tab:          'vi',
+        }));
+      }
+    }
+  } catch (e) { /* keep empty */ }
+
+  function serializeOptions(opts) {
+    if (!Array.isArray(opts)) return '';
+    return opts.map(o => {
+      const vi = (o.label && o.label.vi) || '';
+      const en = (o.label && o.label.en) || '';
+      return [o.value || '', vi, en].join('|');
+    }).join('\n');
+  }
+
+  function parseOptions(raw) {
+    return (raw || '').split('\n').map(line => line.trim()).filter(Boolean).map(line => {
+      const parts = line.split('|');
+      return {
+        value: parts[0] || '',
+        label: { vi: parts[1] || '', en: parts[2] || '' }
+      };
+    });
+  }
+
+  function toSchema() {
+    return {
+      fields: fields.map(f => {
+        const field = {
+          key:      f.key,
+          type:     f.type,
+          required: f.required,
+          title:    { vi: f.title_vi, en: f.title_en },
+        };
+        if (f.placeholder_vi || f.placeholder_en) {
+          field.placeholder = { vi: f.placeholder_vi, en: f.placeholder_en };
+        }
+        if (f.help_text_vi || f.help_text_en) {
+          field.help_text = { vi: f.help_text_vi, en: f.help_text_en };
+        }
+        if (f.type === 'select') {
+          field.options = parseOptions(f.options_raw);
+        }
+        return field;
+      })
+    };
+  }
+
+  function syncJSON() {
+    const schema = toSchema();
+    const json = JSON.stringify(schema, null, 2);
+    document.getElementById('fb-json').value = json;
+    document.getElementById('fb-preview').textContent = json;
+  }
+
+  function renderAll() {
+    const container = document.getElementById('fb-fields');
+    const empty = document.getElementById('fb-empty');
+    container.innerHTML = '';
+    empty.style.display = fields.length === 0 ? 'block' : 'none';
+
+    fields.forEach((f, idx) => {
+      const card = document.createElement('div');
+      card.className = 'rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3';
+
+      const isSelect = f.type === 'select';
+      const typeOptions = TYPES.map(t =>
+        `<option value="${t}" ${f.type===t?'selected':''}>${I18N.types[t]}</option>`
+      ).join('');
+
+      card.innerHTML = `
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">${I18N.fieldN.replace('{n}', idx+1)}</span>
+          <button type="button" data-remove="${idx}"
+                  class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1">
+            <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>${I18N.remove}
+          </button>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3 items-start">
+          <div class="col-span-2 grid gap-1">
+            <label class="text-xs font-medium text-gray-600">${I18N.key}</label>
+            <input type="text" data-idx="${idx}" data-field="key" value="${esc(f.key)}"
+                   placeholder="e.g. full_name"
+                   class="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
+            <p class="text-xs text-gray-400">${I18N.keyHint}</p>
+          </div>
+          <div class="grid gap-1">
+            <label class="text-xs font-medium text-gray-600">${I18N.type}</label>
+            <select data-idx="${idx}" data-field="type"
+                    class="rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
+              ${typeOptions}
+            </select>
+          </div>
+        </div>
+
+        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+          <input type="checkbox" data-idx="${idx}" data-field="required" ${f.required?'checked':''}
+                 class="h-4 w-4 rounded border-gray-300 text-indigo-600">
+          ${I18N.required}
+        </label>
+
+        <div>
+          <div class="flex gap-1 mb-2">
+            <button type="button" data-tab-idx="${idx}" data-lang="vi"
+                    class="tab-btn px-3 py-1 text-xs rounded-md ${f._tab==='vi'?'bg-indigo-600 text-white':'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}">${I18N.tabVi}</button>
+            <button type="button" data-tab-idx="${idx}" data-lang="en"
+                    class="tab-btn px-3 py-1 text-xs rounded-md ${f._tab==='en'?'bg-indigo-600 text-white':'bg-white border border-gray-300 text-gray-600 hover:bg-gray-50'}">${I18N.tabEn}</button>
+          </div>
+
+          <div class="space-y-2 ${f._tab==='vi'?'':'hidden'}" data-panel="${idx}-vi">
+            <div class="grid gap-1">
+              <label class="text-xs font-medium text-gray-600">${I18N.label}</label>
+              <input type="text" data-idx="${idx}" data-field="title_vi" value="${esc(f.title_vi)}"
+                     class="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
+            </div>
+            <div class="grid gap-1">
+              <label class="text-xs font-medium text-gray-600">${I18N.placeholder}</label>
+              <input type="text" data-idx="${idx}" data-field="placeholder_vi" value="${esc(f.placeholder_vi)}"
+                     class="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
+            </div>
+            <div class="grid gap-1">
+              <label class="text-xs font-medium text-gray-600">${I18N.helpText}</label>
+              <input type="text" data-idx="${idx}" data-field="help_text_vi" value="${esc(f.help_text_vi)}"
+                     class="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
+            </div>
+          </div>
+
+          <div class="space-y-2 ${f._tab==='en'?'':'hidden'}" data-panel="${idx}-en">
+            <div class="grid gap-1">
+              <label class="text-xs font-medium text-gray-600">${I18N.label}</label>
+              <input type="text" data-idx="${idx}" data-field="title_en" value="${esc(f.title_en)}"
+                     class="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
+            </div>
+            <div class="grid gap-1">
+              <label class="text-xs font-medium text-gray-600">${I18N.placeholder}</label>
+              <input type="text" data-idx="${idx}" data-field="placeholder_en" value="${esc(f.placeholder_en)}"
+                     class="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
+            </div>
+            <div class="grid gap-1">
+              <label class="text-xs font-medium text-gray-600">${I18N.helpText}</label>
+              <input type="text" data-idx="${idx}" data-field="help_text_en" value="${esc(f.help_text_en)}"
+                     class="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-400">
+            </div>
+          </div>
+        </div>
+
+        ${isSelect ? `
+        <div class="grid gap-1">
+          <label class="text-xs font-medium text-gray-600">${I18N.options}</label>
+          <textarea data-idx="${idx}" data-field="options_raw" rows="4"
+                    class="rounded-md border border-gray-300 px-2.5 py-1.5 text-sm font-mono focus:outline-none focus:ring-1 focus:ring-indigo-400">${esc(f.options_raw)}</textarea>
+        </div>` : ''}
+      `;
+
+      container.appendChild(card);
+    });
+
+    // Re-init lucide icons for dynamically added elements
+    if (window.lucide) lucide.createIcons();
+    bindEvents();
+    syncJSON();
+  }
+
+  function bindEvents() {
+    // Tab switching
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.tabIdx);
+        const lang = btn.dataset.lang;
+        fields[idx]._tab = lang;
+        renderAll();
+      });
+    });
+
+    // Remove field
+    document.querySelectorAll('[data-remove]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.remove);
+        fields.splice(idx, 1);
+        renderAll();
+      });
+    });
+
+    // Input / select / textarea changes
+    document.querySelectorAll('[data-idx][data-field]').forEach(el => {
+      const ev = (el.type === 'checkbox') ? 'change' : 'input';
+      el.addEventListener(ev, () => {
+        const idx = parseInt(el.dataset.idx);
+        const field = el.dataset.field;
+        fields[idx][field] = (el.type === 'checkbox') ? el.checked : el.value;
+        if (field === 'type') {
+          // Re-render to show/hide options textarea
+          renderAll();
+        } else {
+          syncJSON();
+        }
+      });
+    });
+  }
+
+  function esc(str) {
+    return (str || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // Add field button
+  document.getElementById('fb-add').addEventListener('click', () => {
+    fields.push({ key:'', type:'text', required:false, title_vi:'', title_en:'',
+                  placeholder_vi:'', placeholder_en:'', help_text_vi:'', help_text_en:'',
+                  options_raw:'', _tab:'vi' });
+    renderAll();
+  });
+
+  // Sync JSON before form submit
+  document.getElementById('service-type-form').addEventListener('submit', syncJSON);
+
+  // Initial render
+  renderAll();
+})();
+</script>
 {{ end }}
 
 {{ template "base" . }}

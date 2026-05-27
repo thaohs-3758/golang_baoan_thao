@@ -330,13 +330,8 @@ func validateSubmittedData(data json.RawMessage, schema json.RawMessage) error {
 		return nil
 	}
 
-	var s struct {
-		Required []string `json:"required"`
-	}
-	if err := json.Unmarshal(schema, &s); err != nil {
-		return ErrInvalidFormSchema
-	}
-	if len(s.Required) == 0 {
+	required := extractRequiredFields(schema)
+	if len(required) == 0 {
 		return nil
 	}
 
@@ -344,18 +339,53 @@ func validateSubmittedData(data json.RawMessage, schema json.RawMessage) error {
 	if err := json.Unmarshal(data, &submitted); err != nil {
 		return ErrInvalidSubmittedData
 	}
-	for _, field := range s.Required {
+	for _, field := range required {
 		v, ok := submitted[field]
 		if !ok || v == nil {
 			return fmt.Errorf("%w: %s", ErrMissingRequiredField, field)
 		}
-		if str, ok := v.(string); ok {
-			if strings.TrimSpace(str) == "" {
-				return fmt.Errorf("%w: %s", ErrMissingRequiredField, field)
-			}
+		if str, ok := v.(string); ok && strings.TrimSpace(str) == "" {
+			return fmt.Errorf("%w: %s", ErrMissingRequiredField, field)
 		}
 	}
 	return nil
+}
+
+// extractRequiredFields handles both the legacy flat format and the new i18n field format.
+func extractRequiredFields(schema json.RawMessage) []string {
+	// New format: {"fields":[{"key":"x","required":true,...}]}
+	var newFmt struct {
+		Fields []struct {
+			Key      string `json:"key"`
+			Required bool   `json:"required"`
+		} `json:"fields"`
+	}
+	if err := json.Unmarshal(schema, &newFmt); err == nil && len(newFmt.Fields) > 0 && newFmt.Fields[0].Key != "" {
+		var out []string
+		for _, f := range newFmt.Fields {
+			if f.Required {
+				out = append(out, f.Key)
+			}
+		}
+		return out
+	}
+	// Legacy format: {"required":["x"],"required_fields":["x"]}
+	var legacy struct {
+		Required       []string `json:"required"`
+		RequiredFields []string `json:"required_fields"`
+	}
+	if err := json.Unmarshal(schema, &legacy); err != nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	for _, f := range append(legacy.Required, legacy.RequiredFields...) {
+		if !seen[f] {
+			seen[f] = true
+			out = append(out, f)
+		}
+	}
+	return out
 }
 
 func isApplicationRecordNotFound(err error) bool {

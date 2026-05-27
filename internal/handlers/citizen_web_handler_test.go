@@ -1365,9 +1365,6 @@ func TestSubmitApplication_ServiceErrors(t *testing.T) {
 
 func TestParseFormSchema_EmptyRaw(t *testing.T) {
 	result := parseFormSchema(nil)
-	if result.Required == nil {
-		t.Error("expected non-nil Required map")
-	}
 	if len(result.Fields) != 0 {
 		t.Errorf("expected empty Fields, got %v", result.Fields)
 	}
@@ -1375,8 +1372,8 @@ func TestParseFormSchema_EmptyRaw(t *testing.T) {
 
 func TestParseFormSchema_InvalidJSON(t *testing.T) {
 	result := parseFormSchema([]byte("{invalid"))
-	if result.Required == nil {
-		t.Error("expected non-nil Required map")
+	if len(result.Fields) != 0 {
+		t.Errorf("expected empty Fields on invalid JSON, got %v", result.Fields)
 	}
 }
 

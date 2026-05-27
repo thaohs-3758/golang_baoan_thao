@@ -651,31 +651,74 @@ func (h *CitizenWebHandler) ShowApplicationsList(c *echo.Context) error {
 	})
 }
 
-type parsedFormSchema struct {
-	Fields   []string
-	Required map[string]bool
+// renderedField is a form field with labels already resolved to the current language.
+type renderedField struct {
+	Key         string
+	Type        string
+	Required    bool
+	Label       string
+	Placeholder string
+	HelpText    string
+	Options     []struct{ Value, Label string }
 }
 
-func parseFormSchema(raw []byte) parsedFormSchema {
+// parseFormSchema parses both the legacy format {"fields":["key"],"required_fields":["key"]}
+// and the new i18n-aware format {"fields":[{"key":"...","type":"text","required":true,"title":{...}}]}.
+func parseFormSchema(raw []byte) models.FormSchemaV2 {
 	if len(raw) == 0 {
-		return parsedFormSchema{Required: map[string]bool{}}
+		return models.FormSchemaV2{}
 	}
-	var s struct {
+	// New format: fields is an array of objects — unmarshal fails if fields contains strings.
+	var newFmt models.FormSchemaV2
+	if err := json.Unmarshal(raw, &newFmt); err == nil && len(newFmt.Fields) > 0 && newFmt.Fields[0].Key != "" {
+		return newFmt
+	}
+	// Legacy format: {"fields":["key1","key2"],"required_fields":["key1"]}
+	var legacy struct {
 		Fields         []string `json:"fields"`
 		RequiredFields []string `json:"required_fields"`
 		Required       []string `json:"required"`
 	}
-	if err := json.Unmarshal(raw, &s); err != nil {
-		return parsedFormSchema{Required: map[string]bool{}}
+	if err := json.Unmarshal(raw, &legacy); err != nil {
+		return models.FormSchemaV2{}
 	}
-	req := map[string]bool{}
-	for _, f := range s.RequiredFields {
-		req[f] = true
+	reqSet := map[string]bool{}
+	for _, f := range legacy.RequiredFields {
+		reqSet[f] = true
 	}
-	for _, f := range s.Required {
-		req[f] = true
+	for _, f := range legacy.Required {
+		reqSet[f] = true
 	}
-	return parsedFormSchema{Fields: s.Fields, Required: req}
+	fields := make([]models.FormField, 0, len(legacy.Fields))
+	for _, key := range legacy.Fields {
+		fields = append(fields, models.FormField{
+			Key:      key,
+			Type:     models.FormFieldText,
+			Required: reqSet[key],
+			Title:    models.LocalizedString{"vi": key, "en": key},
+		})
+	}
+	return models.FormSchemaV2{Fields: fields}
+}
+
+// renderSchemaFields resolves localized labels for the given language.
+func renderSchemaFields(schema models.FormSchemaV2, lang string) []renderedField {
+	out := make([]renderedField, 0, len(schema.Fields))
+	for _, f := range schema.Fields {
+		rf := renderedField{
+			Key:         f.Key,
+			Type:        string(f.Type),
+			Required:    f.Required,
+			Label:       f.Title.Resolve(lang),
+			Placeholder: f.Placeholder.Resolve(lang),
+			HelpText:    f.HelpText.Resolve(lang),
+		}
+		for _, opt := range f.Options {
+			rf.Options = append(rf.Options, struct{ Value, Label string }{opt.Value, opt.Label.Resolve(lang)})
+		}
+		out = append(out, rf)
+	}
+	return out
 }
 
 // ShowApplyForm handles GET /citizen/applications/new
@@ -699,16 +742,17 @@ func (h *CitizenWebHandler) ShowApplyForm(c *echo.Context) error {
 	}
 
 	schema := parseFormSchema(st.FormSchema)
+	lang := configs.LocaleFromContext(c)
 
 	return c.Render(http.StatusOK, "citizen/pages/applications/new.html", map[string]interface{}{
-		"Title":       configs.T(c, "ui.citizen.applications.new.title", nil),
-		"CurrentPath": "/citizen/applications",
-		"CurrentUser": claims,
-		"UnreadCount": h.unreadCount(claims.ID),
-		"ServiceType": st,
-		"Schema":      schema,
-		"Values":      map[string]string{},
-		"CSRFToken":   h.csrfToken(c),
+		"Title":          configs.T(c, "ui.citizen.applications.new.title", nil),
+		"CurrentPath":    "/citizen/applications",
+		"CurrentUser":    claims,
+		"UnreadCount":    h.unreadCount(claims.ID),
+		"ServiceType":    st,
+		"RenderedFields": renderSchemaFields(schema, lang),
+		"Values":         map[string]string{},
+		"CSRFToken":      h.csrfToken(c),
 	})
 }
 
@@ -735,9 +779,9 @@ func (h *CitizenWebHandler) SubmitApplication(c *echo.Context) error {
 	values := map[string]string{}
 	fieldData := map[string]interface{}{}
 	for _, f := range schema.Fields {
-		v := c.FormValue(f)
-		values[f] = v
-		fieldData[f] = v
+		v := c.FormValue(f.Key)
+		values[f.Key] = v
+		fieldData[f.Key] = v
 	}
 
 	submittedData, _ := json.Marshal(fieldData)
@@ -769,16 +813,17 @@ func (h *CitizenWebHandler) SubmitApplication(c *echo.Context) error {
 		default:
 			errMsg = configs.T(c, "common.internal_error", nil)
 		}
+		lang := configs.LocaleFromContext(c)
 		return c.Render(http.StatusUnprocessableEntity, "citizen/pages/applications/new.html", map[string]interface{}{
-			"Title":       configs.T(c, "ui.citizen.applications.new.title", nil),
-			"CurrentPath": "/citizen/applications",
-			"CurrentUser": claims,
-			"UnreadCount": h.unreadCount(claims.ID),
-			"ServiceType": st,
-			"Schema":      schema,
-			"Values":      values,
-			"Error":       errMsg,
-			"CSRFToken":   h.csrfToken(c),
+			"Title":          configs.T(c, "ui.citizen.applications.new.title", nil),
+			"CurrentPath":    "/citizen/applications",
+			"CurrentUser":    claims,
+			"UnreadCount":    h.unreadCount(claims.ID),
+			"ServiceType":    st,
+			"RenderedFields": renderSchemaFields(schema, lang),
+			"Values":         values,
+			"Error":          errMsg,
+			"CSRFToken":      h.csrfToken(c),
 		})
 	}
 
