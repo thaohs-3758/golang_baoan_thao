@@ -331,6 +331,32 @@ func (h *AdminDepartmentHandler) listStaffUsers() ([]models.User, error) {
 	return staff, nil
 }
 
+// filterOutOtherDeptLeaders removes staff who are leaders of a department other
+// than targetDeptID. Managers are not allowed to reassign such staff.
+func (h *AdminDepartmentHandler) filterOutOtherDeptLeaders(users []models.User, targetDeptID string) []models.User {
+	depts, _, err := h.svc.ListDepartments(repositories.DepartmentFilter{}, 1, 10000)
+	if err != nil {
+		return []models.User{}
+	}
+	blocked := make(map[string]struct{})
+	for _, d := range depts {
+		if d.ID == targetDeptID || d.LeaderUserID == nil {
+			continue
+		}
+		blocked[*d.LeaderUserID] = struct{}{}
+	}
+	if len(blocked) == 0 {
+		return users
+	}
+	filtered := make([]models.User, 0, len(users))
+	for _, u := range users {
+		if _, ok := blocked[u.ID]; !ok {
+			filtered = append(filtered, u)
+		}
+	}
+	return filtered
+}
+
 func (h *AdminDepartmentHandler) listAssignableStaffUsers() ([]models.User, error) {
 	users, _, err := h.userSvc.ListUsers(repositories.UserFilter{}, 1, 1000)
 	if err != nil {
@@ -396,13 +422,19 @@ func (h *AdminDepartmentHandler) ListDepartmentStaff(c *echo.Context) error {
 }
 
 func (h *AdminDepartmentHandler) ShowAssignStaffForm(c *echo.Context) error {
+	id, err := departmentIDParam(c)
+	if err != nil {
+		return err
+	}
 	staffUsers, err := h.listAssignableStaffUsers()
 	if err != nil {
 		return err
 	}
-	id, err := departmentIDParam(c)
-	if err != nil {
-		return err
+	// Managers cannot transfer a staff who is a leader of another department.
+	// Filter them out of the dropdown so the UI never offers an unselectable choice.
+	currentUser := adminCurrentUser(c)
+	if currentUser != nil && currentUser.Role == string(models.UserRoleManager) {
+		staffUsers = h.filterOutOtherDeptLeaders(staffUsers, id)
 	}
 	warn := c.QueryParam("warn")
 	selectedUserID := c.QueryParam("user_id")

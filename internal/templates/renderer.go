@@ -41,6 +41,7 @@ func NewRenderer(root string) (*TemplateRenderer, error) {
 		},
 		// stub for fmtTime so templates can be parsed before real func is injected
 		"fmtTime": func(v interface{}, layout string) string { return "" },
+		"concat":  func(a, b string) string { return a + b },
 	})
 	raw := map[string]string{}
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {

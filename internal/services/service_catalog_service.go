@@ -59,6 +59,7 @@ func (s *ServiceCatalogService) Create(ctx context.Context, st *models.ServiceTy
 		Action:      "service_type.create",
 		EntityType:  "service_type",
 		EntityID:    &st.ID,
+		Description: "Tạo loại dịch vụ: " + st.Name,
 		Result:      "success",
 		CreatedAt:   time.Now(),
 	})
@@ -90,6 +91,7 @@ func (s *ServiceCatalogService) Update(ctx context.Context, st *models.ServiceTy
 		Action:       "service_type.update",
 		EntityType:   "service_type",
 		EntityID:     &st.ID,
+		Description:  "Cập nhật loại dịch vụ: " + st.Name,
 		Result:       "success",
 		MetadataJSON: mustJSON(metadata),
 		CreatedAt:    time.Now(),
@@ -120,6 +122,7 @@ func (s *ServiceCatalogService) Delete(ctx context.Context, id string) error {
 		Action:      "service_type.delete",
 		EntityType:  "service_type",
 		EntityID:    &serviceType.ID,
+		Description: "Xóa loại dịch vụ: " + serviceType.Name,
 		Result:      "success",
 		CreatedAt:   time.Now(),
 	})

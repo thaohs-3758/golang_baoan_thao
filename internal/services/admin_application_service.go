@@ -136,6 +136,7 @@ func (s *AdminApplicationService) ProcessApplication(applicationID string, newSt
 		Action:      "application.status_update",
 		EntityType:  "application",
 		EntityID:    &app.ID,
+		Description: "Cập nhật trạng thái hồ sơ " + app.ApplicationCode + " → " + string(newStatus),
 		Result:      "success",
 		MetadataJSON: mustJSON(map[string]any{
 			"changes": map[string]any{

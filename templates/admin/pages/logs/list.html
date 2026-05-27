@@ -3,9 +3,17 @@
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-xl font-semibold text-gray-900">{{ t "ui.logs.title" }}</h1>
     {{ if .CanCleanup }}
-    <form method="post" action="/admin/logs/cleanup" class="flex items-center gap-2" onsubmit="return confirm('Bạn có chắc muốn xóa log cũ?')">
+    <form method="post" action="/admin/logs/cleanup"
+          data-modal-title="{{ t "ui.logs.cleanup.modal_title" }}"
+          data-modal-message="{{ t "ui.logs.cleanup.modal_message" }}"
+          data-modal-variant="warning"
+          class="flex items-center gap-2">
       <input type="number" min="1" name="retain_days" placeholder="{{ t "ui.logs.cleanup.retain_days" }}" class="rounded-lg border border-gray-300 text-sm px-3 py-2 w-56">
-      <button class="bg-red-600 text-white hover:bg-red-700 px-4 py-2 rounded-md text-sm">{{ t "ui.logs.cleanup.submit" }}</button>
+      <button type="button" data-modal-target="confirm-modal"
+              class="inline-flex items-center gap-1.5 bg-red-600 text-white hover:bg-red-700 px-4 py-2 rounded-md text-sm">
+        <i data-lucide="trash-2" class="h-3.5 w-3.5"></i>
+        {{ t "ui.logs.cleanup.submit" }}
+      </button>
     </form>
     {{ end }}
   </div>
@@ -17,9 +25,9 @@
   {{ end }}
 
   <form method="get" action="/admin/logs" class="flex gap-3 mb-4">
-    <input name="action" value="{{ .FilterAction }}" placeholder="{{ t "ui.logs.filter.action" }}" class="rounded-lg border border-gray-300 text-sm px-3 py-2 w-64">
-    <input name="result" value="{{ .FilterResult }}" placeholder="{{ t "ui.logs.filter.result" }}" class="rounded-lg border border-gray-300 text-sm px-3 py-2 w-48">
-    <input name="actor_user_id" value="{{ .FilterActor }}" placeholder="{{ t "ui.logs.filter.actor_user_id" }}" class="rounded-lg border border-gray-300 text-sm px-3 py-2 w-64">
+    <input name="action" value="{{ .FilterAction }}" placeholder="{{ t "ui.logs.filter.action" }}" class="rounded-lg border border-gray-300 text-sm px-3 py-2 w-52">
+    <input name="result" value="{{ .FilterResult }}" placeholder="{{ t "ui.logs.filter.result" }}" class="rounded-lg border border-gray-300 text-sm px-3 py-2 w-36">
+    <input name="actor_user_id" value="{{ .FilterActor }}" placeholder="{{ t "ui.logs.filter.actor_user_id" }}" class="rounded-lg border border-gray-300 text-sm px-3 py-2 w-56">
     <button class="bg-indigo-600 text-white hover:bg-indigo-700 px-4 py-2 rounded-md text-sm">{{ t "ui.common.search" }}</button>
     <a href="/admin/logs" class="bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 px-4 py-2 rounded-md text-sm">{{ t "ui.common.reset" }}</a>
   </form>
@@ -37,10 +45,27 @@
       <tbody class="divide-y divide-gray-200">
         {{ range .Logs }}
         <tr class="hover:bg-gray-50">
-          <td class="px-4 py-3 text-sm text-gray-700">{{ fmtTime .CreatedAt "15:04 02/01/2006" }}</td>
-          <td class="px-4 py-3 text-sm text-gray-700">{{ if .ActorUser }}{{ .ActorUser.Name }}{{ else }}-{{ end }}</td>
-          <td class="px-4 py-3 text-sm text-gray-700">{{ .Action }}</td>
-          <td class="px-4 py-3 text-sm text-gray-700">{{ if .Description }}{{ .Description }}{{ else }}{{ .EntityType }}{{ if .EntityID }}: {{ .EntityID }}{{ end }}{{ end }}</td>
+          <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{{ fmtTime .CreatedAt "15:04 02/01/2006" }}</td>
+          <td class="px-4 py-3 text-sm text-gray-700">{{ if .ActorUser }}<span class="font-medium">{{ .ActorUser.Name }}</span>{{ else }}<span class="text-gray-400">—</span>{{ end }}</td>
+          <td class="px-4 py-3">
+            {{ $label := t (concat "ui.logs.action." .Action) }}
+            {{ if eq $label (concat "ui.logs.action." .Action) }}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-gray-100 text-gray-600">{{ .Action }}</span>
+            {{ else }}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+              {{- if or (eq .Action "category.delete") (eq .Action "department.delete") (eq .Action "user.delete") (eq .Action "service_type.delete") }} bg-red-50 text-red-700
+              {{- else if eq .Action "user.block" }} bg-orange-50 text-orange-700
+              {{- else if or (eq .Action "user.unblock") (eq .Action "category.create") (eq .Action "department.create") (eq .Action "user.create") (eq .Action "service_type.create") }} bg-green-50 text-green-700
+              {{- else if or (eq .Action "auth.login") (eq .Action "auth.logout") }} bg-blue-50 text-blue-700
+              {{- else if or (eq .Action "application.submit") (eq .Action "application.status_update") (eq .Action "assignment.assign") (eq .Action "assignment.transfer") (eq .Action "assignment.unassign") }} bg-indigo-50 text-indigo-700
+              {{- else if or (eq .Action "profile.update") (eq .Action "profile.change_password") (eq .Action "service_type.update") }} bg-purple-50 text-purple-700
+              {{- else }} bg-gray-100 text-gray-600
+              {{- end }}">{{ $label }}</span>
+            {{ end }}
+          </td>
+          <td class="px-4 py-3 text-sm text-gray-700">
+            {{ if .Description }}{{ .Description }}{{ else }}<span class="text-gray-400 italic text-xs">{{ .EntityType }}{{ if .EntityID }}: {{ .EntityID }}{{ end }}</span>{{ end }}
+          </td>
         </tr>
         {{ else }}
         <tr><td colspan="4" class="text-gray-400 text-center py-8">{{ t "ui.users.empty" }}</td></tr>

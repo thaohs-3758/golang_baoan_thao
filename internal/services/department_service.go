@@ -87,6 +87,7 @@ func (s *DepartmentService) CreateDepartment(req *dtos.DepartmentCreateRequest, 
 		Action:      "department.create",
 		EntityType:  "department",
 		EntityID:    &created.ID,
+		Description: "Tạo phòng ban: " + created.Name,
 		Result:      "success",
 		CreatedAt:   now,
 	})
@@ -158,6 +159,7 @@ func (s *DepartmentService) UpdateDepartment(id string, req *dtos.DepartmentUpda
 		Action:      "department.update",
 		EntityType:  "department",
 		EntityID:    &dept.ID,
+		Description: "Cập nhật phòng ban: " + dept.Name,
 		Result:      "success",
 		MetadataJSON: mustJSON(map[string]any{
 			"changes": map[string]any{
@@ -188,6 +190,7 @@ func (s *DepartmentService) DeleteDepartment(id string, deletedBy string) error 
 		Action:      "department.delete",
 		EntityType:  "department",
 		EntityID:    &id,
+		Description: "Xóa phòng ban: " + dept.Name,
 		Result:      "success",
 		CreatedAt:   now,
 	})

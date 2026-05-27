@@ -78,6 +78,7 @@ func (s *CategoryService) CreateCategory(req *dtos.CategoryCreateRequest, create
 		Action:      "category.create",
 		EntityType:  "category",
 		EntityID:    &created.ID,
+		Description: "Tạo danh mục: " + created.Name,
 		Result:      "success",
 		CreatedAt:   now,
 	})
@@ -124,6 +125,7 @@ func (s *CategoryService) UpdateCategory(id string, req *dtos.CategoryUpdateRequ
 		Action:      "category.update",
 		EntityType:  "category",
 		EntityID:    &cat.ID,
+		Description: "Cập nhật danh mục: " + cat.Name,
 		Result:      "success",
 		MetadataJSON: mustJSON(map[string]any{
 			"changes": map[string]any{
@@ -155,6 +157,7 @@ func (s *CategoryService) DeleteCategory(id string, deletedBy string) error {
 		Action:      "category.delete",
 		EntityType:  "category",
 		EntityID:    &id,
+		Description: "Xóa danh mục: " + cat.Name,
 		Result:      "success",
 		CreatedAt:   now,
 	})

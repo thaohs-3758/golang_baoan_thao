@@ -163,6 +163,7 @@ func (s *ApplicationService) SubmitApplication(
 		Action:      "application.submit",
 		EntityType:  "application",
 		EntityID:    &app.ID,
+		Description: "Nộp hồ sơ: " + app.ApplicationCode,
 		Result:      "success",
 		MetadataJSON: mustJSON(map[string]any{
 			"service_type_id": app.ServiceTypeID,

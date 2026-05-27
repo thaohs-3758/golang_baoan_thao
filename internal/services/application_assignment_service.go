@@ -69,12 +69,12 @@ func (s *ApplicationAssignmentService) AssignApplicationToStaff(applicationID st
 	if err := s.appRepo.UpdateAssignedStaff(applicationID, toStaffUserID, assignedBy); err != nil {
 		return err
 	}
-	s.logAssignmentActivity(applicationID, assignedBy, action, app.AssignedStaffUserID, toStaffUserID)
+	s.logAssignmentActivity(applicationID, app.ApplicationCode, assignedBy, action, app.AssignedStaffUserID, toStaffUserID)
 
 	return nil
 }
 
-func (s *ApplicationAssignmentService) logAssignmentActivity(applicationID, assignedBy string, action models.AssignmentAction, fromStaffUserID, toStaffUserID *string) {
+func (s *ApplicationAssignmentService) logAssignmentActivity(applicationID, applicationCode, assignedBy string, action models.AssignmentAction, fromStaffUserID, toStaffUserID *string) {
 	if s.activityLogger == nil {
 		return
 	}
@@ -90,11 +90,13 @@ func (s *ApplicationAssignmentService) logAssignmentActivity(applicationID, assi
 		return
 	}
 	actorID := assignedBy
+	description := "Phân công hồ sơ " + applicationCode
 	entry := &models.ActivityLog{
 		ActorUserID: &actorID,
 		Action:      actionName,
 		EntityType:  "application",
 		EntityID:    &applicationID,
+		Description: description,
 		Result:      "success",
 		MetadataJSON: mustJSON(map[string]any{
 			"changes": map[string]any{

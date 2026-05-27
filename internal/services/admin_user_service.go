@@ -90,6 +90,7 @@ func (s *AdminUserService) CreateUser(req *dtos.AdminCreateUserRequest, createdB
 		Action:      "user.create",
 		EntityType:  "user",
 		EntityID:    &created.ID,
+		Description: "Tạo người dùng: " + created.Name + " (" + created.Email + ")",
 		Result:      "success",
 		MetadataJSON: mustJSON(map[string]any{
 			"role":   created.Role,
@@ -128,6 +129,7 @@ func (s *AdminUserService) UpdateUser(id string, req *dtos.AdminUpdateUserReques
 		Action:      "user.update",
 		EntityType:  "user",
 		EntityID:    &user.ID,
+		Description: "Cập nhật người dùng: " + user.Name,
 		Result:      "success",
 		MetadataJSON: mustJSON(map[string]any{
 			"changes": map[string]any{
@@ -159,6 +161,7 @@ func (s *AdminUserService) BlockUser(id string, updatedBy string) error {
 		Action:      "user.block",
 		EntityType:  "user",
 		EntityID:    &id,
+		Description: "Khóa tài khoản: " + user.Name,
 		Result:      "success",
 		CreatedAt:   now,
 	})
@@ -182,6 +185,7 @@ func (s *AdminUserService) UnblockUser(id string, updatedBy string) error {
 		Action:      "user.unblock",
 		EntityType:  "user",
 		EntityID:    &id,
+		Description: "Mở khóa tài khoản: " + user.Name,
 		Result:      "success",
 		CreatedAt:   now,
 	})
@@ -205,6 +209,7 @@ func (s *AdminUserService) DeleteUser(id string, deletedBy string) error {
 		Action:      "user.delete",
 		EntityType:  "user",
 		EntityID:    &id,
+		Description: "Xóa người dùng: " + user.Name,
 		Result:      "success",
 		CreatedAt:   now,
 	})
