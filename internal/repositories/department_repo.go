@@ -60,7 +60,7 @@ func (r *DepartmentRepo) FindByCode(code string) (*models.Department, error) {
 
 func (r *DepartmentRepo) FindByLeaderUserID(userID string) (*models.Department, error) {
 	var dept models.Department
-	tx := r.db.Where("leader_user_id = ? AND deleted_at IS NULL", userID).Limit(1).Find(&dept)
+	tx := r.db.Where("leader_user_id = ? AND deleted_at IS NULL", userID).Order(`"departments"."id"`).Limit(1).Find(&dept)
 	if tx.Error != nil {
 		return nil, tx.Error
 	}
