@@ -288,51 +288,77 @@ func seedServiceTypes(db *gorm.DB) error {
 		return fmt.Errorf("lookup category LDXH: %w", err)
 	}
 
-	schemaID, _ := json.Marshal(map[string]interface{}{
-		"name":            "Mẫu đơn cấp CCCD",
-		"fields":          []string{"full_name", "date_of_birth", "gender", "nationality"},
-		"required_fields": []string{"full_name", "date_of_birth", "gender"},
-	})
-	schemaLicense, _ := json.Marshal(map[string]interface{}{
-		"name":            "Mẫu đơn cấp Giấy phép lái xe",
-		"fields":          []string{"license_class", "experience_years", "medical_exam_date"},
-		"required_fields": []string{"license_class", "medical_exam_date"},
-	})
-	schemaBike, _ := json.Marshal(map[string]interface{}{
-		"name":            "Mẫu đơn đăng ký xe",
-		"fields":          []string{"vehicle_type", "vehicle_brand", "chassis_no", "engine_no"},
-		"required_fields": []string{"vehicle_type", "chassis_no", "engine_no"},
-	})
-	schemaEdu, _ := json.Marshal(map[string]interface{}{
-		"name":            "Mẫu đơn đăng ký nhập học",
-		"fields":          []string{"student_name", "date_of_birth", "school_name", "grade"},
-		"required_fields": []string{"student_name", "date_of_birth", "school_name", "grade"},
-	})
-	schemaHealth, _ := json.Marshal(map[string]interface{}{
-		"name":            "Mẫu đơn đăng ký khám sức khỏe",
-		"fields":          []string{"full_name", "date_of_birth", "health_insurance_no", "preferred_date"},
-		"required_fields": []string{"full_name", "date_of_birth"},
-	})
-	schemaBiz, _ := json.Marshal(map[string]interface{}{
-		"name":            "Mẫu đơn đăng ký kinh doanh",
-		"fields":          []string{"business_name", "business_type", "capital", "address"},
-		"required_fields": []string{"business_name", "business_type", "address"},
-	})
-	schemaMarriage, _ := json.Marshal(map[string]interface{}{
-		"name":            "Mẫu đơn đăng ký kết hôn",
-		"fields":          []string{"groom_name", "bride_name", "wedding_date", "ceremony_address"},
-		"required_fields": []string{"groom_name", "bride_name", "wedding_date"},
-	})
-	schemaBirth, _ := json.Marshal(map[string]interface{}{
-		"name":            "Mẫu đơn đăng ký khai sinh",
-		"fields":          []string{"child_name", "date_of_birth", "father_name", "mother_name"},
-		"required_fields": []string{"child_name", "date_of_birth", "mother_name"},
-	})
-	schemaJob, _ := json.Marshal(map[string]interface{}{
-		"name":            "Mẫu đơn trợ cấp thất nghiệp",
-		"fields":          []string{"full_name", "last_employer", "termination_date", "bank_account"},
-		"required_fields": []string{"full_name", "last_employer", "termination_date"},
-	})
+	mustMarshal := func(v interface{}) json.RawMessage {
+		b, _ := json.Marshal(v)
+		return b
+	}
+	loc := func(vi, en string) models.LocalizedString { return models.LocalizedString{"vi": vi, "en": en} }
+
+	schemaID := mustMarshal(models.FormSchemaV2{Fields: []models.FormField{
+		{Key: "full_name", Type: models.FormFieldText, Required: true, Title: loc("Họ và tên", "Full Name")},
+		{Key: "date_of_birth", Type: models.FormFieldDate, Required: true, Title: loc("Ngày sinh", "Date of Birth")},
+		{Key: "gender", Type: models.FormFieldSelect, Required: true, Title: loc("Giới tính", "Gender"), Options: []models.FormFieldOption{
+			{Value: "male", Label: loc("Nam", "Male")},
+			{Value: "female", Label: loc("Nữ", "Female")},
+			{Value: "other", Label: loc("Khác", "Other")},
+		}},
+		{Key: "nationality", Type: models.FormFieldText, Required: false, Title: loc("Quốc tịch", "Nationality")},
+	}})
+	schemaLicense := mustMarshal(models.FormSchemaV2{Fields: []models.FormField{
+		{Key: "license_class", Type: models.FormFieldSelect, Required: true, Title: loc("Hạng bằng lái", "License Class"), Options: []models.FormFieldOption{
+			{Value: "A", Label: loc("Hạng A (xe máy)", "Class A (motorbike)")},
+			{Value: "B", Label: loc("Hạng B (ô tô ≤ 9 chỗ)", "Class B (car ≤ 9 seats)")},
+			{Value: "C", Label: loc("Hạng C (ô tô tải)", "Class C (truck)")},
+		}},
+		{Key: "experience_years", Type: models.FormFieldNumber, Required: false, Title: loc("Số năm kinh nghiệm lái xe", "Driving Experience (years)")},
+		{Key: "medical_exam_date", Type: models.FormFieldDate, Required: true, Title: loc("Ngày khám sức khỏe", "Medical Exam Date")},
+	}})
+	schemaBike := mustMarshal(models.FormSchemaV2{Fields: []models.FormField{
+		{Key: "vehicle_type", Type: models.FormFieldSelect, Required: true, Title: loc("Loại xe", "Vehicle Type"), Options: []models.FormFieldOption{
+			{Value: "motorbike", Label: loc("Xe máy", "Motorbike")},
+			{Value: "car", Label: loc("Ô tô", "Car")},
+			{Value: "electric_bike", Label: loc("Xe điện", "Electric Bike")},
+		}},
+		{Key: "vehicle_brand", Type: models.FormFieldText, Required: false, Title: loc("Hãng xe", "Vehicle Brand")},
+		{Key: "chassis_no", Type: models.FormFieldText, Required: true, Title: loc("Số khung xe", "Chassis Number")},
+		{Key: "engine_no", Type: models.FormFieldText, Required: true, Title: loc("Số máy", "Engine Number")},
+	}})
+	schemaEdu := mustMarshal(models.FormSchemaV2{Fields: []models.FormField{
+		{Key: "student_name", Type: models.FormFieldText, Required: true, Title: loc("Họ và tên học sinh", "Student Name")},
+		{Key: "date_of_birth", Type: models.FormFieldDate, Required: true, Title: loc("Ngày sinh", "Date of Birth")},
+		{Key: "school_name", Type: models.FormFieldText, Required: true, Title: loc("Tên trường đăng ký", "School Name")},
+		{Key: "grade", Type: models.FormFieldText, Required: true, Title: loc("Khối/Lớp đăng ký", "Grade")},
+	}})
+	schemaHealth := mustMarshal(models.FormSchemaV2{Fields: []models.FormField{
+		{Key: "full_name", Type: models.FormFieldText, Required: true, Title: loc("Họ và tên", "Full Name")},
+		{Key: "date_of_birth", Type: models.FormFieldDate, Required: true, Title: loc("Ngày sinh", "Date of Birth")},
+		{Key: "health_insurance_no", Type: models.FormFieldText, Required: false, Title: loc("Số thẻ bảo hiểm y tế", "Health Insurance Number")},
+		{Key: "preferred_date", Type: models.FormFieldDate, Required: false, Title: loc("Ngày khám mong muốn", "Preferred Exam Date")},
+	}})
+	schemaBiz := mustMarshal(models.FormSchemaV2{Fields: []models.FormField{
+		{Key: "business_name", Type: models.FormFieldText, Required: true, Title: loc("Tên hộ kinh doanh", "Business Name")},
+		{Key: "business_type", Type: models.FormFieldText, Required: true, Title: loc("Ngành nghề kinh doanh", "Business Type")},
+		{Key: "capital", Type: models.FormFieldNumber, Required: false, Title: loc("Vốn kinh doanh (VNĐ)", "Capital (VND)")},
+		{Key: "address", Type: models.FormFieldText, Required: true, Title: loc("Địa chỉ kinh doanh", "Business Address")},
+	}})
+	schemaMarriage := mustMarshal(models.FormSchemaV2{Fields: []models.FormField{
+		{Key: "groom_name", Type: models.FormFieldText, Required: true, Title: loc("Họ tên chú rể", "Groom's Full Name")},
+		{Key: "bride_name", Type: models.FormFieldText, Required: true, Title: loc("Họ tên cô dâu", "Bride's Full Name")},
+		{Key: "wedding_date", Type: models.FormFieldDate, Required: true, Title: loc("Ngày đăng ký kết hôn", "Wedding Date")},
+		{Key: "ceremony_address", Type: models.FormFieldText, Required: false, Title: loc("Địa chỉ tổ chức", "Ceremony Address")},
+	}})
+	schemaBirth := mustMarshal(models.FormSchemaV2{Fields: []models.FormField{
+		{Key: "child_name", Type: models.FormFieldText, Required: true, Title: loc("Họ và tên trẻ", "Child's Full Name")},
+		{Key: "date_of_birth", Type: models.FormFieldDate, Required: true, Title: loc("Ngày sinh", "Date of Birth")},
+		{Key: "father_name", Type: models.FormFieldText, Required: false, Title: loc("Họ tên cha", "Father's Name")},
+		{Key: "mother_name", Type: models.FormFieldText, Required: true, Title: loc("Họ tên mẹ", "Mother's Name")},
+	}})
+	schemaJob := mustMarshal(models.FormSchemaV2{Fields: []models.FormField{
+		{Key: "full_name", Type: models.FormFieldText, Required: true, Title: loc("Họ và tên", "Full Name")},
+		{Key: "last_employer", Type: models.FormFieldText, Required: true, Title: loc("Tên đơn vị làm việc cuối", "Last Employer")},
+		{Key: "termination_date", Type: models.FormFieldDate, Required: true, Title: loc("Ngày chấm dứt hợp đồng", "Contract Termination Date")},
+		{Key: "bank_account", Type: models.FormFieldText, Required: false, Title: loc("Số tài khoản ngân hàng", "Bank Account Number")},
+	}})
 
 	serviceTypes := []models.ServiceType{
 		{

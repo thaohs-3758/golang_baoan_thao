@@ -24,6 +24,7 @@ const openAPISpec = `{
     { "name": "Citizen Profile", "description": "Citizen's own profile (view & update)" },
     { "name": "Applications",    "description": "Submit and track public-service applications" },
     { "name": "Service Catalog", "description": "Browse available service types" },
+    { "name": "Notifications",   "description": "Citizen notifications" },
     { "name": "Admin — Citizens",      "description": "Admin: list, export and import citizen accounts" },
     { "name": "Admin — Departments",   "description": "Admin: export and import departments" },
     { "name": "Admin — Staff",         "description": "Admin: export and import staff accounts" },
@@ -415,17 +416,36 @@ const openAPISpec = `{
         }
       }
     },
-    "/admin/citizens/export": {
+    "/admin/users/export/citizens": {
       "get": {
         "tags": ["Admin — Citizens"],
         "summary": "Export all citizens as CSV",
-        "description": "Streams all citizen rows (so_cccd, ho_ten, email, so_dien_thoai, dia_chi, ngay_sinh, tong_ho_so) as a UTF-8 BOM CSV file. Filename: citizens.csv.",
+        "description": "Streams all citizen rows (so_cccd, ho_ten, email, so_dien_thoai, dia_chi, ngay_sinh, tong_ho_so) as a UTF-8 BOM CSV file. Filename: citizens.csv. Super Admin only.",
         "security": [{ "BearerAuth": [] }],
         "responses": {
           "200": {
             "description": "CSV file download",
             "headers": {
               "Content-Disposition": { "schema": { "type": "string", "example": "attachment; filename=\"citizens.csv\"" } }
+            },
+            "content": { "text/csv": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/admin/citizens/template": {
+      "get": {
+        "tags": ["Admin — Citizens"],
+        "summary": "Download CSV import template for citizens",
+        "description": "Returns a CSV file with the expected header row: so_cccd,ho_ten,email. Super Admin only.",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "CSV template file",
+            "headers": {
+              "Content-Disposition": { "schema": { "type": "string", "example": "attachment; filename=\"citizens_template.csv\"" } }
             },
             "content": { "text/csv": { "schema": { "type": "string", "format": "binary" } } }
           },
@@ -482,6 +502,25 @@ const openAPISpec = `{
         }
       }
     },
+    "/admin/departments/template": {
+      "get": {
+        "tags": ["Admin — Departments"],
+        "summary": "Download CSV import template for departments",
+        "description": "Returns a CSV file with the expected header row: ten,mo_ta,ma_code. Manager + Super Admin.",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "CSV template file",
+            "headers": {
+              "Content-Disposition": { "schema": { "type": "string", "example": "attachment; filename=\"departments_template.csv\"" } }
+            },
+            "content": { "text/csv": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
     "/admin/departments/import": {
       "post": {
         "tags": ["Admin — Departments"],
@@ -511,17 +550,36 @@ const openAPISpec = `{
         }
       }
     },
-    "/admin/users/export": {
+    "/admin/users/export/staff": {
       "get": {
         "tags": ["Admin — Staff"],
         "summary": "Export all staff accounts as CSV",
-        "description": "Streams all staff users (ho_ten, email, so_dien_thoai, dia_chi, vai_tro, trang_thai) as a UTF-8 BOM CSV file. Filename: users.csv.",
+        "description": "Streams all staff users (ho_ten, email, so_dien_thoai, dia_chi, vai_tro, trang_thai) as a UTF-8 BOM CSV file. Filename: users.csv. Super Admin only.",
         "security": [{ "BearerAuth": [] }],
         "responses": {
           "200": {
             "description": "CSV file download",
             "headers": {
               "Content-Disposition": { "schema": { "type": "string", "example": "attachment; filename=\"users.csv\"" } }
+            },
+            "content": { "text/csv": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/admin/users/template": {
+      "get": {
+        "tags": ["Admin — Staff"],
+        "summary": "Download CSV import template for staff accounts",
+        "description": "Returns a CSV file with the expected header row: ho_ten,email,so_cccd,so_dien_thoai,vai_tro,ma_phong_ban. Super Admin only.",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "CSV template file",
+            "headers": {
+              "Content-Disposition": { "schema": { "type": "string", "example": "attachment; filename=\"users_template.csv\"" } }
             },
             "content": { "text/csv": { "schema": { "type": "string", "format": "binary" } } }
           },
@@ -570,6 +628,25 @@ const openAPISpec = `{
             "description": "CSV file download",
             "headers": {
               "Content-Disposition": { "schema": { "type": "string", "example": "attachment; filename=\"service_types.csv\"" } }
+            },
+            "content": { "text/csv": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "403": { "$ref": "#/components/responses/Forbidden" }
+        }
+      }
+    },
+    "/admin/service-types/template": {
+      "get": {
+        "tags": ["Admin — Service Types"],
+        "summary": "Download CSV import template for service types",
+        "description": "Returns a CSV file with the expected header row: ten,mo_ta,thoi_gian_xu_ly_ngay,phi,ma_phong_ban. Super Admin only.",
+        "security": [{ "BearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "CSV template file",
+            "headers": {
+              "Content-Disposition": { "schema": { "type": "string", "example": "attachment; filename=\"service_types_template.csv\"" } }
             },
             "content": { "text/csv": { "schema": { "type": "string", "format": "binary" } } }
           },
@@ -642,6 +719,66 @@ const openAPISpec = `{
           },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/citizens/me/notifications": {
+      "get": {
+        "tags": ["Notifications"],
+        "summary": "List my notifications",
+        "description": "Returns a paginated list of the authenticated citizen's notifications, ordered by created_at descending.",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "Accept-Language", "in": "header", "schema": { "type": "string", "enum": ["vi", "en"], "default": "vi" } },
+          { "name": "page",    "in": "query", "schema": { "type": "integer", "minimum": 1, "default": 1 }, "description": "Page number" },
+          { "name": "limit",   "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 10 }, "description": "Items per page" },
+          { "name": "type",    "in": "query", "schema": { "type": "string" }, "description": "Filter by notification type" },
+          { "name": "is_read", "in": "query", "schema": { "type": "boolean" }, "description": "Filter by read status (true / false)" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications retrieved",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/NotificationListResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "description": "Internal server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/citizens/me/notifications/read-all": {
+      "put": {
+        "tags": ["Notifications"],
+        "summary": "Mark all notifications as read",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "Accept-Language", "in": "header", "schema": { "type": "string", "enum": ["vi", "en"], "default": "vi" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "All notifications marked as read",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MessageResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "description": "Internal server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
+        }
+      }
+    },
+    "/api/citizens/me/notifications/{id}/read": {
+      "put": {
+        "tags": ["Notifications"],
+        "summary": "Mark a single notification as read",
+        "security": [{ "BearerAuth": [] }],
+        "parameters": [
+          { "name": "Accept-Language", "in": "header", "schema": { "type": "string", "enum": ["vi", "en"], "default": "vi" } },
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string", "format": "uuid" }, "description": "Notification ID" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification marked as read",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MessageResponse" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "500": { "description": "Internal server error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorResponse" } } } }
         }
       }
     }
@@ -898,6 +1035,26 @@ const openAPISpec = `{
           "page":  { "type": "integer", "example": 1 },
           "limit": { "type": "integer", "example": 10 },
           "total": { "type": "integer", "example": 42 }
+        }
+      },
+      "NotificationResponse": {
+        "type": "object",
+        "properties": {
+          "id":             { "type": "string", "format": "uuid" },
+          "application_id": { "type": "string", "format": "uuid", "nullable": true },
+          "title":          { "type": "string" },
+          "message":        { "type": "string" },
+          "type":           { "type": "string", "description": "Notification type, e.g. application_received, status_updated, supplement_requested" },
+          "is_read":        { "type": "boolean" },
+          "read_at":        { "type": "string", "format": "date-time", "nullable": true },
+          "created_at":     { "type": "string", "format": "date-time" }
+        }
+      },
+      "NotificationListResponse": {
+        "type": "object",
+        "properties": {
+          "notifications": { "type": "array", "items": { "$ref": "#/components/schemas/NotificationResponse" } },
+          "pagination":    { "$ref": "#/components/schemas/Pagination" }
         }
       },
       "ErrorDetail": {
