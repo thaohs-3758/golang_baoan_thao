@@ -5,6 +5,9 @@
     {{ template "admin/partials/topbar.html" . }}
     <main class="flex-1 overflow-y-auto bg-gray-50">
       <div class="max-w-2xl mx-auto p-6 space-y-6">
+        {{ $role := "" }}
+        {{ if .CurrentUser }}{{ $role = printf "%s" .CurrentUser.Role }}{{ end }}
+        {{ $hideProfileCard := or (eq $role "super_admin") (eq $role "manager") }}
 
         <!-- Page Header -->
         <div class="flex items-center justify-between">
@@ -18,6 +21,7 @@
         </div>
         {{ end }}
 
+        {{ if not $hideProfileCard }}
         <!-- User Info (read-only) -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           <h2 class="text-base font-medium text-gray-800 mb-4">{{ t "ui.profile.info_title" }}</h2>
@@ -40,6 +44,7 @@
             </div>
           </div>
         </div>
+        {{ end }}
 
         <!-- Contact Update Form -->
         <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

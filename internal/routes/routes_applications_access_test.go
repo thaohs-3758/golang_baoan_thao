@@ -41,12 +41,12 @@ func (s *fakeAdminApplicationsSvc) ListApplicationsForActor(_ repositories.Appli
 
 func (s *fakeAdminApplicationsSvc) GetApplication(_ string) (*models.Application, error) {
 	return &models.Application{
-		ID:             "a1",
+		ID:              "a1",
 		ApplicationCode: "APP-1",
-		Status:         models.ApplicationStatusReceived,
-		SubmittedAt:    time.Now(),
-		ServiceType:    models.ServiceType{Name: "Svc"},
-		CitizenUser:    models.User{Name: "Citizen"},
+		Status:          models.ApplicationStatusReceived,
+		SubmittedAt:     time.Now(),
+		ServiceType:     models.ServiceType{Name: "Svc"},
+		CitizenUser:     models.User{Name: "Citizen"},
 	}, nil
 }
 
@@ -184,8 +184,8 @@ func TestAdminProfileRouteAccessPolicy(t *testing.T) {
 		wantAllowed bool
 	}{
 		{name: "staff allowed", role: models.UserRoleStaff, wantAllowed: true},
-		{name: "manager allowed", role: models.UserRoleManager, wantAllowed: true},
-		{name: "super_admin allowed", role: models.UserRoleSuperAdmin, wantAllowed: true},
+		{name: "manager denied", role: models.UserRoleManager, wantAllowed: false},
+		{name: "super_admin denied", role: models.UserRoleSuperAdmin, wantAllowed: false},
 		{name: "citizen denied", role: models.UserRoleCitizen, wantAllowed: false},
 	}
 

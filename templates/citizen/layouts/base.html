@@ -16,8 +16,8 @@
     </main>
   {{ else }}
     <div class="min-h-screen">
-      <div class="lg:flex">
-        <aside class="hidden lg:block w-56 border-r border-gray-200 bg-white">
+      <div class="lg:flex lg:min-h-screen">
+        <aside class="hidden lg:sticky lg:top-0 lg:block lg:h-screen w-56 border-r border-gray-200 bg-white overflow-hidden">
           {{ template "citizen/partials/sidebar.html" . }}
         </aside>
 

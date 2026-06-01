@@ -72,8 +72,8 @@ func SetupRoutes(e *echo.Echo, handler *ApiHandler) {
 	admin := e.Group("/admin", middlewares.AdminWebMiddleware)
 	admin.GET("", handler.AdminDashboardHandler.ShowDashboard)
 
-	// Admin self-profile (staff + manager + super_admin)
-	adminProfile := admin.Group("", middlewares.AdminWebRequireRoles(models.UserRoleStaff, models.UserRoleManager, models.UserRoleSuperAdmin))
+	// Admin self-profile (staff only)
+	adminProfile := admin.Group("", middlewares.AdminWebRequireRoles(models.UserRoleStaff))
 	adminProfile.GET("/profile", handler.AdminProfileHandler.ShowProfilePage)
 	adminProfile.POST("/profile", handler.AdminProfileHandler.UpdateProfile)
 	adminProfile.POST("/profile/password", handler.AdminProfileHandler.ChangePassword)

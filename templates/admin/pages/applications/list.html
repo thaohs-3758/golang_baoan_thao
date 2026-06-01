@@ -41,11 +41,11 @@
     </form>
   </section>
 
-  <section class="bg-white rounded-lg shadow-sm border border-gray-200">
+  <section class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
     {{ if .Applications }}
     <!-- Table for medium+ screens -->
-    <div class="hidden md:block">
-      <table class="w-full table-auto divide-y divide-gray-200">
+    <div class="hidden md:block overflow-x-auto">
+      <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
           <tr>
             <th scope="col" class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{{ t "ui.applications.col.code" }}</th>
