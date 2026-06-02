@@ -132,9 +132,16 @@ func (s *fakeStorage) SaveApplicationFile(_ string, fh *multipart.FileHeader) (s
 func (s *fakeStorage) RemoveApplicationDir(_ string) error { return nil }
 func (s *fakeStorage) RemoveFile(_ string) error           { return nil }
 
-type fakeMailer struct{ sent bool }
+type fakeMailer struct {
+	sent bool
+	body string
+}
 
-func (m *fakeMailer) Send(_, _, _ string) error { m.sent = true; return nil }
+func (m *fakeMailer) Send(_, _, _, body string, _ ...string) error {
+	m.sent = true
+	m.body = body
+	return nil
+}
 
 type fakeActivityLogger struct {
 	entries []*models.ActivityLog

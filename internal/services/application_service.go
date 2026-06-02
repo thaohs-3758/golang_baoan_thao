@@ -197,7 +197,13 @@ func (s *ApplicationService) SubmitApplication(
 		}
 		subject := configs.TLang("vi", "mail.application_received.subject", params)
 		body := configs.TLang("vi", "mail.application_received.body", params)
-		if err := s.mailer.Send(user.Email, subject, body); err != nil {
+		ccEmail := ""
+		if app.ServiceType.ResponsibleDepartment != nil &&
+			app.ServiceType.ResponsibleDepartment.LeaderUser != nil &&
+			app.ServiceType.ResponsibleDepartment.LeaderUser.Email != "" {
+			ccEmail = app.ServiceType.ResponsibleDepartment.LeaderUser.Email
+		}
+		if err := s.mailer.Send(ccEmail, user.Email, subject, body); err != nil {
 			log.Printf("send confirmation email failed: %v", err)
 		}
 	}()

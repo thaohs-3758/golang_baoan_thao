@@ -105,7 +105,8 @@ func main() {
 	applicationAssignmentRepo := repositories.NewApplicationAssignmentRepo(db)
 	applicationAssignmentSvc := services.NewApplicationAssignmentService(applicationRepo, applicationAssignmentRepo, userRepo, activityLogSvc)
 	adminApplicationSvc := services.NewAdminApplicationService(applicationRepo, applicationAssignmentSvc, storage, activityLogSvc).
-		WithNotificationRepo(notificationRepo)
+		WithNotificationRepo(notificationRepo).
+		WithMailer(mailer)
 	adminApplicationHandler := handlers.NewAdminApplicationHandler(adminApplicationSvc, adminUserSvc, staffProfileSvc)
 
 	categoryRepo := repositories.NewCategoryRepo(db)

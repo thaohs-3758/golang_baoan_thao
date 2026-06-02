@@ -299,13 +299,17 @@ func TestAdminApplicationService_ProcessApplication_SendsNotificationApproved(t 
 		ID:              "app1",
 		ApplicationCode: "APP-1",
 		Status:          models.ApplicationStatusProcessing,
+		CitizenUser:     models.User{ID: "citizen-1", Email: "citizen@test.com", Name: "Citizen"},
 		ServiceType:     models.ServiceType{Name: "Test Service"},
 	}}
 	svc := newAdminAppSvc(repo)
 	svc.WithNotificationRepo(&fakeNotificationRepo{})
+	mailer := &fakeMailer{}
+	svc.mailer = mailer
 
 	err := svc.ProcessApplication("app1", models.ApplicationStatusApproved, "Approved", nil, "admin-1")
 	assert.NoError(t, err)
+	assert.True(t, mailer.sent)
 }
 
 func TestAdminApplicationService_ProcessApplication_SendsNotificationRejected(t *testing.T) {
@@ -378,6 +382,27 @@ func TestAdminApplicationService_ProcessApplication_WithStorage_OK(t *testing.T)
 	files := []*multipart.FileHeader{{Filename: "result.pdf", Size: 1024}}
 	err := svc.ProcessApplication("app1", models.ApplicationStatusProcessing, "note", files, "admin-1")
 	assert.NoError(t, err)
+}
+
+func TestAdminApplicationService_ProcessApplication_EmailIncludesAttachmentURLs(t *testing.T) {
+	repo := &fakeAdminAppRepo{app: &models.Application{
+		ID:              "app1",
+		ApplicationCode: "APP-1",
+		Status:          models.ApplicationStatusProcessing,
+		CitizenUser:     models.User{ID: "citizen-1", Email: "citizen@test.com", Name: "Citizen"},
+		ServiceType:     models.ServiceType{Name: "Test Service"},
+	}}
+	storage := &fakeStorage{pubURL: "/uploads/app1/result.pdf", mime: "application/pdf", size: 1024}
+	assignSvc := NewApplicationAssignmentService(repo, &fakeAssignRepo{}, &fakeUserRepoAssign{})
+	mailer := &fakeMailer{}
+	svc := NewAdminApplicationService(repo, assignSvc, storage).WithMailer(mailer)
+
+	files := []*multipart.FileHeader{{Filename: "result.pdf", Size: 1024}}
+	err := svc.ProcessApplication("app1", models.ApplicationStatusApproved, "approved", files, "admin-1")
+
+	assert.NoError(t, err)
+	assert.True(t, mailer.sent)
+	assert.Contains(t, mailer.body, "/uploads/app1/result.pdf")
 }
 
 func TestAdminApplicationService_ProcessApplication_WithStorage_SaveError(t *testing.T) {

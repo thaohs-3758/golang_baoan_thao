@@ -13,10 +13,10 @@ import (
 const codeRetryAttempts = 3
 
 type DashboardStats struct {
-	Total     int64
-	Pending   int64
-	Approved  int64
-	Rejected  int64
+	Total    int64
+	Pending  int64
+	Approved int64
+	Rejected int64
 }
 
 type DashboardRepository interface {
@@ -100,6 +100,8 @@ func (r *applicationRepo) GetByID(id string) (*models.Application, error) {
 	var app models.Application
 	if err := r.db.Preload("CitizenUser", "deleted_at IS NULL").
 		Preload("ServiceType", "deleted_at IS NULL").
+		Preload("ServiceType.ResponsibleDepartment", "deleted_at IS NULL").
+		Preload("ServiceType.ResponsibleDepartment.LeaderUser", "deleted_at IS NULL").
 		Preload("AssignedStaffUser", "deleted_at IS NULL").
 		Preload("ApplicationAttachments", "deleted_at IS NULL").
 		Where("id = ? AND deleted_at IS NULL", id).
