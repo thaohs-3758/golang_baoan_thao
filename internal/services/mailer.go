@@ -1,17 +1,18 @@
 package services
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 
 	"github.com/awesome-academy/golang_baoan_thao/internal/utils"
-	"github.com/wneessen/go-mail"
+	gomail "gopkg.in/gomail.v2"
 )
 
 type Mailer interface {
-	Send(toEmail, subject, body string) error
+	Send(ccEmail, toEmail, subject, body string, attachments ...string) error
 }
 
 type SMTPConfig struct {
@@ -55,28 +56,25 @@ func NewSMTPMailer(cfg SMTPConfig) *SMTPMailer {
 	return &SMTPMailer{cfg: cfg}
 }
 
-func (m *SMTPMailer) Send(toEmail, subject, body string) error {
-	msg := mail.NewMsg()
-	if err := msg.FromFormat(m.cfg.FromName, m.cfg.From); err != nil {
-		return fmt.Errorf("set FROM: %w", err)
-	}
-	if err := msg.To(toEmail); err != nil {
-		return fmt.Errorf("set TO: %w", err)
-	}
-	msg.Subject(subject)
-	msg.SetBodyString(mail.TypeTextPlain, body)
-
-	client, err := mail.NewClient(
-		m.cfg.Host,
-		mail.WithPort(m.cfg.Port),
-		mail.WithSMTPAuth(mail.SMTPAuthLogin),
-		mail.WithUsername(m.cfg.Username),
-		mail.WithPassword(m.cfg.Password),
-		mail.WithTLSPolicy(mail.TLSMandatory),
-	)
-	if err != nil {
-		return fmt.Errorf("smtp client: %w", err)
+func (m *SMTPMailer) Send(ccEmail, toEmail, subject, body string, attachments ...string) error {
+	msg := gomail.NewMessage()
+	msg.SetAddressHeader("From", m.cfg.From, m.cfg.FromName)
+	msg.SetHeader("To", toEmail)
+	msg.SetHeader("Cc", ccEmail)
+	msg.SetHeader("Subject", subject)
+	msg.SetBody("text/plain", body)
+	for _, attachment := range attachments {
+		msg.Attach(attachment)
 	}
 
-	return client.DialAndSend(msg)
+	dialer := gomail.NewDialer(m.cfg.Host, m.cfg.Port, m.cfg.Username, m.cfg.Password)
+	dialer.TLSConfig = &tls.Config{
+		MinVersion: tls.VersionTLS12,
+		ServerName: m.cfg.Host,
+	}
+
+	if err := dialer.DialAndSend(msg); err != nil {
+		return fmt.Errorf("send smtp mail: %w", err)
+	}
+	return nil
 }

@@ -24,6 +24,7 @@ type AdminApplicationService struct {
 	storage          utils.FileStorage
 	activityLogger   activityLogger
 	notificationRepo repositories.NotificationRepository
+	mailer           Mailer
 }
 
 func NewAdminApplicationService(appRepo repositories.ApplicationRepository, assignService *ApplicationAssignmentService, storage utils.FileStorage, loggers ...activityLogger) *AdminApplicationService {
@@ -36,6 +37,11 @@ func NewAdminApplicationService(appRepo repositories.ApplicationRepository, assi
 
 func (s *AdminApplicationService) WithNotificationRepo(repo repositories.NotificationRepository) *AdminApplicationService {
 	s.notificationRepo = repo
+	return s
+}
+
+func (s *AdminApplicationService) WithMailer(mailer Mailer) *AdminApplicationService {
+	s.mailer = mailer
 	return s
 }
 
@@ -153,8 +159,61 @@ func (s *AdminApplicationService) ProcessApplication(applicationID string, newSt
 	})
 
 	s.notifyCitizenStatusChange(app, newStatus, note, now)
+	s.sendCitizenStatusChangeEmail(app, newStatus, note, savedURLs)
 
 	return nil
+}
+
+func (s *AdminApplicationService) sendCitizenStatusChangeEmail(app *models.Application, newStatus models.ApplicationStatus, note string, attachmentURLs []string) {
+	if s.mailer == nil || app == nil || strings.TrimSpace(app.CitizenUser.Email) == "" {
+		return
+	}
+
+	params := map[string]string{
+		"code":    app.ApplicationCode,
+		"service": app.ServiceType.Name,
+		"note":    strings.TrimSpace(note),
+	}
+
+	var subjectKey, bodyKey string
+	switch newStatus {
+	case models.ApplicationStatusProcessing:
+		subjectKey = "notification.processing.title"
+		bodyKey = "notification.processing.message"
+	case models.ApplicationStatusNeedMoreInfo:
+		subjectKey = "notification.need_more_info.title"
+		bodyKey = "notification.need_more_info.message"
+	case models.ApplicationStatusApproved:
+		subjectKey = "notification.approved.title"
+		bodyKey = "notification.approved.message"
+	case models.ApplicationStatusRejected:
+		subjectKey = "notification.rejected.title"
+		bodyKey = "notification.rejected.message"
+	default:
+		return
+	}
+
+	ccEmail := ""
+	if app.ServiceType.ResponsibleDepartment != nil &&
+		app.ServiceType.ResponsibleDepartment.LeaderUser != nil &&
+		strings.TrimSpace(app.ServiceType.ResponsibleDepartment.LeaderUser.Email) != "" {
+		ccEmail = app.ServiceType.ResponsibleDepartment.LeaderUser.Email
+	}
+
+	subject := configs.TLang(configs.DefaultLocale, subjectKey, params)
+	body := configs.TLang(configs.DefaultLocale, bodyKey, params)
+	if len(attachmentURLs) > 0 {
+		body += "\n\nAttachment URLs:"
+		for _, attachmentURL := range attachmentURLs {
+			if strings.TrimSpace(attachmentURL) == "" {
+				continue
+			}
+			body += "\n- " + attachmentURL
+		}
+	}
+	if err := s.mailer.Send(ccEmail, app.CitizenUser.Email, subject, body); err != nil {
+		log.Printf("send status-change email failed for app %s: %v", app.ID, err)
+	}
 }
 
 func (s *AdminApplicationService) notifyCitizenStatusChange(app *models.Application, newStatus models.ApplicationStatus, note string, now time.Time) {
