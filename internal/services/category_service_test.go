@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -25,26 +26,28 @@ type fakeCategoryRepo struct {
 	deleteErr error
 }
 
-func (r *fakeCategoryRepo) FindByID(_ string) (*models.Category, error) {
+func (r *fakeCategoryRepo) FindByID(_ context.Context, _ string) (*models.Category, error) {
 	return r.cat, r.findErr
 }
-func (r *fakeCategoryRepo) FindByCode(_ string) (*models.Category, error) {
+func (r *fakeCategoryRepo) FindByCode(_ context.Context, _ string) (*models.Category, error) {
 	return r.codeCat, r.codeErr
 }
-func (r *fakeCategoryRepo) Create(c *models.Category) (*models.Category, error) {
+func (r *fakeCategoryRepo) Create(_ context.Context, c *models.Category) (*models.Category, error) {
 	if r.createErr != nil {
 		return nil, r.createErr
 	}
 	return c, nil
 }
-func (r *fakeCategoryRepo) Update(_ *models.Category) error { return r.updateErr }
-func (r *fakeCategoryRepo) List(_ repositories.CategoryFilter, _, _ int) ([]models.Category, int64, error) {
+func (r *fakeCategoryRepo) Update(_ context.Context, _ *models.Category) error { return r.updateErr }
+func (r *fakeCategoryRepo) List(_ context.Context, _ repositories.CategoryFilter, _, _ int) ([]models.Category, int64, error) {
 	if r.findErr != nil {
 		return nil, 0, r.findErr
 	}
 	return r.cats, r.total, nil
 }
-func (r *fakeCategoryRepo) SoftDelete(_ string, _ string) error { return r.deleteErr }
+func (r *fakeCategoryRepo) SoftDelete(_ context.Context, _ string, _ string) error {
+	return r.deleteErr
+}
 
 var _ repositories.CategoryRepository = (*fakeCategoryRepo)(nil)
 

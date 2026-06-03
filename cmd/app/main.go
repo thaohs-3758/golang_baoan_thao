@@ -8,10 +8,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/awesome-academy/golang_baoan_thao/internal/cache"
 	"github.com/awesome-academy/golang_baoan_thao/internal/configs"
 	"github.com/awesome-academy/golang_baoan_thao/internal/docs"
 	"github.com/awesome-academy/golang_baoan_thao/internal/handlers"
 	"github.com/awesome-academy/golang_baoan_thao/internal/middlewares"
+	"github.com/awesome-academy/golang_baoan_thao/internal/realtime"
 	"github.com/awesome-academy/golang_baoan_thao/internal/repositories"
 	"github.com/awesome-academy/golang_baoan_thao/internal/routes"
 	"github.com/awesome-academy/golang_baoan_thao/internal/services"
@@ -57,7 +59,11 @@ func main() {
 	userRepo := repositories.NewUserRepo(db)
 	citizenProfileRepo := repositories.NewCitizenProfileRepository(db)
 	applicationRepo := repositories.NewApplicationRepository(db)
-	serviceCatalogRepo := repositories.NewServiceTypeRepository(db)
+	redisClient := cache.NewRedisClient()
+	jsonCache := cache.NewJSONCache(redisClient, cache.TTL())
+
+	baseServiceCatalogRepo := repositories.NewServiceTypeRepository(db)
+	serviceCatalogRepo := repositories.NewCachedServiceTypeRepository(baseServiceCatalogRepo, jsonCache)
 	notificationRepo := repositories.NewNotificationRepository(db)
 	notificationSvc := services.NewNotificationService(notificationRepo)
 	notificationHandler := handlers.NewNotificationHandler(notificationSvc)
@@ -95,21 +101,27 @@ func main() {
 	adminDashboardSvc := services.NewAdminDashboardService(applicationRepo)
 	adminDashboardHandler := handlers.NewAdminDashboardHandler(adminDashboardSvc)
 
-	departmentRepo := repositories.NewDepartmentRepo(db)
+	baseDepartmentRepo := repositories.NewDepartmentRepo(db)
+	departmentRepo := repositories.NewCachedDepartmentRepository(baseDepartmentRepo, jsonCache)
 	staffProfileRepo := repositories.NewStaffProfileRepo(db)
 	departmentSvc := services.NewDepartmentService(departmentRepo, staffProfileRepo, activityLogSvc)
 	staffProfileSvc := services.NewStaffProfileService(staffProfileRepo, userRepo, departmentRepo)
 	adminDepartmentHandler := handlers.NewAdminDepartmentHandler(departmentSvc, adminUserSvc, staffProfileSvc)
+
+	// Realtime notification hub
+	realtimeHub := realtime.NewHub()
+	realtimeHandler := handlers.NewRealtimeHandler(realtimeHub)
 
 	// application assignment service + admin handler
 	applicationAssignmentRepo := repositories.NewApplicationAssignmentRepo(db)
 	applicationAssignmentSvc := services.NewApplicationAssignmentService(applicationRepo, applicationAssignmentRepo, userRepo, activityLogSvc)
 	adminApplicationSvc := services.NewAdminApplicationService(applicationRepo, applicationAssignmentSvc, storage, activityLogSvc).
 		WithNotificationRepo(notificationRepo).
-		WithMailer(mailer)
+		WithMailer(mailer).WithRealtimeNotifier(realtimeHub)
 	adminApplicationHandler := handlers.NewAdminApplicationHandler(adminApplicationSvc, adminUserSvc, staffProfileSvc)
 
-	categoryRepo := repositories.NewCategoryRepo(db)
+	baseCategoryRepo := repositories.NewCategoryRepo(db)
+	categoryRepo := repositories.NewCachedCategoryRepository(baseCategoryRepo, jsonCache)
 	categorySvc := services.NewCategoryService(categoryRepo, activityLogSvc)
 	adminCategoryHandler := handlers.NewAdminCategoryHandler(categorySvc)
 	adminLogHandler := handlers.NewAdminLogHandler(activityLogSvc)
@@ -127,6 +139,7 @@ func main() {
 	adminProfileHandler := handlers.NewAdminProfileHandler(adminProfileSvc).WithActivityLogger(activityLogSvc)
 
 	docs.SetupSwaggerRoutes(e)
+
 	routes.SetupRoutes(e, &routes.ApiHandler{
 		AuthHandler:             authHandler,
 		AdminAuthHandler:        adminAuthHandler,
@@ -143,6 +156,7 @@ func main() {
 		AdminCategoryHandler:    adminCategoryHandler,
 		NotificationHandler:     notificationHandler,
 		CitizenWebHandler:       citizenWebHandler,
+		RealtimeHandler:         realtimeHandler,
 	})
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

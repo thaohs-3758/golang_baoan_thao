@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"errors"
 	"strings"
 	"time"
@@ -14,12 +15,12 @@ type CategoryFilter struct {
 }
 
 type CategoryRepository interface {
-	FindByID(id string) (*models.Category, error)
-	FindByCode(code string) (*models.Category, error)
-	Create(cat *models.Category) (*models.Category, error)
-	Update(cat *models.Category) error
-	List(filter CategoryFilter, offset, limit int) ([]models.Category, int64, error)
-	SoftDelete(id string, deletedBy string) error
+	FindByID(ctx context.Context, id string) (*models.Category, error)
+	FindByCode(ctx context.Context, code string) (*models.Category, error)
+	Create(ctx context.Context, cat *models.Category) (*models.Category, error)
+	Update(ctx context.Context, cat *models.Category) error
+	List(ctx context.Context, filter CategoryFilter, offset, limit int) ([]models.Category, int64, error)
+	SoftDelete(ctx context.Context, id string, deletedBy string) error
 }
 
 type CategoryRepo struct {
@@ -30,9 +31,9 @@ func NewCategoryRepo(db *gorm.DB) CategoryRepository {
 	return &CategoryRepo{db: db}
 }
 
-func (r *CategoryRepo) FindByID(id string) (*models.Category, error) {
+func (r *CategoryRepo) FindByID(ctx context.Context, id string) (*models.Category, error) {
 	var cat models.Category
-	err := r.db.Where("id = ? AND deleted_at IS NULL", id).First(&cat).Error
+	err := r.db.WithContext(ctx).Where("id = ? AND deleted_at IS NULL", id).First(&cat).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -42,9 +43,9 @@ func (r *CategoryRepo) FindByID(id string) (*models.Category, error) {
 	return &cat, nil
 }
 
-func (r *CategoryRepo) FindByCode(code string) (*models.Category, error) {
+func (r *CategoryRepo) FindByCode(ctx context.Context, code string) (*models.Category, error) {
 	var cat models.Category
-	err := r.db.Where("code = ? AND deleted_at IS NULL", code).First(&cat).Error
+	err := r.db.WithContext(ctx).Where("code = ? AND deleted_at IS NULL", code).First(&cat).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -54,19 +55,19 @@ func (r *CategoryRepo) FindByCode(code string) (*models.Category, error) {
 	return &cat, nil
 }
 
-func (r *CategoryRepo) Create(cat *models.Category) (*models.Category, error) {
-	if err := r.db.Create(cat).Error; err != nil {
+func (r *CategoryRepo) Create(ctx context.Context, cat *models.Category) (*models.Category, error) {
+	if err := r.db.WithContext(ctx).Create(cat).Error; err != nil {
 		return nil, err
 	}
 	return cat, nil
 }
 
-func (r *CategoryRepo) Update(cat *models.Category) error {
-	return r.db.Save(cat).Error
+func (r *CategoryRepo) Update(ctx context.Context, cat *models.Category) error {
+	return r.db.WithContext(ctx).Save(cat).Error
 }
 
-func (r *CategoryRepo) List(filter CategoryFilter, offset, limit int) ([]models.Category, int64, error) {
-	q := r.db.Model(&models.Category{}).Where("deleted_at IS NULL")
+func (r *CategoryRepo) List(ctx context.Context, filter CategoryFilter, offset, limit int) ([]models.Category, int64, error) {
+	q := r.db.WithContext(ctx).Model(&models.Category{}).Where("deleted_at IS NULL")
 	if filter.Search != "" {
 		like := "%" + strings.ToLower(filter.Search) + "%"
 		q = q.Where("LOWER(name) LIKE ? OR LOWER(code) LIKE ?", like, like)
@@ -84,9 +85,9 @@ func (r *CategoryRepo) List(filter CategoryFilter, offset, limit int) ([]models.
 	return cats, total, nil
 }
 
-func (r *CategoryRepo) SoftDelete(id string, deletedBy string) error {
+func (r *CategoryRepo) SoftDelete(ctx context.Context, id string, deletedBy string) error {
 	now := time.Now()
-	return r.db.Model(&models.Category{}).
+	return r.db.WithContext(ctx).Model(&models.Category{}).
 		Where("id = ? AND deleted_at IS NULL", id).
 		Updates(map[string]interface{}{
 			"deleted_at": now,

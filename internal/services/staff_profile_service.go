@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 
 	"github.com/awesome-academy/golang_baoan_thao/internal/models"
@@ -10,9 +11,9 @@ import (
 var ErrLeaderTransferForbiddenForManager = errors.New("department.leader_transfer_forbidden_for_manager")
 
 type StaffProfileService struct {
-	repo      repositories.StaffProfileRepository
-	userRepo  repositories.UserRepository
-	deptRepo  repositories.DepartmentRepository
+	repo     repositories.StaffProfileRepository
+	userRepo repositories.UserRepository
+	deptRepo repositories.DepartmentRepository
 }
 
 func NewStaffProfileService(repo repositories.StaffProfileRepository, userRepo repositories.UserRepository, deptRepo ...repositories.DepartmentRepository) *StaffProfileService {
@@ -43,7 +44,7 @@ func (s *StaffProfileService) AssignStaffToDepartment(userID string, deptID stri
 		return err
 	}
 	if actor.Role == models.UserRoleManager && s.deptRepo != nil {
-		leaderDept, err := s.deptRepo.FindByLeaderUserID(userID)
+		leaderDept, err := s.deptRepo.FindByLeaderUserID(context.Background(), userID)
 		if err != nil {
 			return err
 		}
@@ -60,7 +61,7 @@ func (s *StaffProfileService) RemoveStaffFromDepartment(userID string, updatedBy
 		return err
 	}
 	if actor.Role == models.UserRoleManager && s.deptRepo != nil {
-		leaderDept, err := s.deptRepo.FindByLeaderUserID(userID)
+		leaderDept, err := s.deptRepo.FindByLeaderUserID(context.Background(), userID)
 		if err != nil {
 			return err
 		}

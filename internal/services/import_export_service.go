@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -37,11 +38,11 @@ type StaffImportRow struct {
 }
 
 type ServiceTypeImportRow struct {
-	Ten                     string
-	MoTa                    string
-	ThoiGianXuLyNgay        string
-	Phi                     string
-	MaPhongBan              string
+	Ten              string
+	MoTa             string
+	ThoiGianXuLyNgay string
+	Phi              string
+	MaPhongBan       string
 }
 
 type CitizenImportRow struct {
@@ -56,11 +57,11 @@ type CitizenImportRow struct {
 // --- import/export service ---
 
 type ImportExportService struct {
-	db              Transactor
-	deptRepo        repositories.DepartmentRepository
-	userRepo        repositories.UserRepository
-	profileRepo     repositories.CitizenProfileRepository
-	serviceRepo     repositories.ServiceTypeRepository
+	db               Transactor
+	deptRepo         repositories.DepartmentRepository
+	userRepo         repositories.UserRepository
+	profileRepo      repositories.CitizenProfileRepository
+	serviceRepo      repositories.ServiceTypeRepository
 	staffProfileRepo repositories.StaffProfileRepository
 }
 
@@ -184,7 +185,7 @@ func (s *ImportExportService) ImportStaff(rows []StaffImportRow, createdBy strin
 			role: validStaffRoles[strings.ToLower(strings.TrimSpace(r.VaiTro))],
 		}
 		if code := strings.TrimSpace(r.MaPhongBan); code != "" {
-			dept, deptErr := s.deptRepo.FindByCode(code)
+			dept, deptErr := s.deptRepo.FindByCode(context.Background(), code)
 			if deptErr != nil {
 				return []string{fmt.Sprintf("Dòng %d: lỗi tra cứu phòng ban '%s'", i+2, code)}
 			}
@@ -248,10 +249,10 @@ func (s *ImportExportService) ImportServiceTypes(rows []ServiceTypeImportRow, cr
 
 	// Pre-resolve department IDs and parse numeric fields outside the transaction.
 	type serviceTypeBatch struct {
-		row              ServiceTypeImportRow
-		processingTime   *int
-		fee              float64
-		departmentID     *string
+		row            ServiceTypeImportRow
+		processingTime *int
+		fee            float64
+		departmentID   *string
 	}
 	batches := make([]serviceTypeBatch, len(rows))
 	for i, r := range rows {
@@ -267,7 +268,7 @@ func (s *ImportExportService) ImportServiceTypes(rows []ServiceTypeImportRow, cr
 			}
 		}
 		if code := strings.TrimSpace(r.MaPhongBan); code != "" {
-			dept, deptErr := s.deptRepo.FindByCode(code)
+			dept, deptErr := s.deptRepo.FindByCode(context.Background(), code)
 			if deptErr != nil {
 				return []string{fmt.Sprintf("Dòng %d: lỗi tra cứu phòng ban '%s'", i+2, code)}
 			}

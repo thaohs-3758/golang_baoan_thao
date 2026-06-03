@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"log"
 	"time"
@@ -34,11 +35,11 @@ func NewCategoryService(repo repositories.CategoryRepository, loggers ...activit
 
 func (s *CategoryService) ListCategories(filter repositories.CategoryFilter, page, limit int) ([]models.Category, int64, error) {
 	offset := (page - 1) * limit
-	return s.repo.List(filter, offset, limit)
+	return s.repo.List(context.Background(), filter, offset, limit)
 }
 
 func (s *CategoryService) GetCategory(id string) (*models.Category, error) {
-	cat, err := s.repo.FindByID(id)
+	cat, err := s.repo.FindByID(context.Background(), id)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +50,7 @@ func (s *CategoryService) GetCategory(id string) (*models.Category, error) {
 }
 
 func (s *CategoryService) CreateCategory(req *dtos.CategoryCreateRequest, createdBy string) (*models.Category, error) {
-	existing, err := s.repo.FindByCode(req.Code)
+	existing, err := s.repo.FindByCode(context.Background(), req.Code)
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +67,7 @@ func (s *CategoryService) CreateCategory(req *dtos.CategoryCreateRequest, create
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}
-	created, err := s.repo.Create(cat)
+	created, err := s.repo.Create(context.Background(), cat)
 	if err != nil {
 		if isCategoryUniqueViolation(err) {
 			return nil, ErrCategoryCodeExists
@@ -86,7 +87,7 @@ func (s *CategoryService) CreateCategory(req *dtos.CategoryCreateRequest, create
 }
 
 func (s *CategoryService) UpdateCategory(id string, req *dtos.CategoryUpdateRequest, updatedBy string) (*models.Category, error) {
-	cat, err := s.repo.FindByID(id)
+	cat, err := s.repo.FindByID(context.Background(), id)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +100,7 @@ func (s *CategoryService) UpdateCategory(id string, req *dtos.CategoryUpdateRequ
 	prevActive := cat.IsActive
 
 	if req.Code != cat.Code {
-		existing, err := s.repo.FindByCode(req.Code)
+		existing, err := s.repo.FindByCode(context.Background(), req.Code)
 		if err != nil {
 			return nil, err
 		}
@@ -114,7 +115,7 @@ func (s *CategoryService) UpdateCategory(id string, req *dtos.CategoryUpdateRequ
 	cat.IsActive = req.IsActive
 	cat.UpdatedAt = time.Now()
 
-	if err := s.repo.Update(cat); err != nil {
+	if err := s.repo.Update(context.Background(), cat); err != nil {
 		if isCategoryUniqueViolation(err) {
 			return nil, ErrCategoryCodeExists
 		}
@@ -141,14 +142,14 @@ func (s *CategoryService) UpdateCategory(id string, req *dtos.CategoryUpdateRequ
 }
 
 func (s *CategoryService) DeleteCategory(id string, deletedBy string) error {
-	cat, err := s.repo.FindByID(id)
+	cat, err := s.repo.FindByID(context.Background(), id)
 	if err != nil {
 		return err
 	}
 	if cat == nil {
 		return ErrCategoryNotFound
 	}
-	if err := s.repo.SoftDelete(id, deletedBy); err != nil {
+	if err := s.repo.SoftDelete(context.Background(), id, deletedBy); err != nil {
 		return err
 	}
 	now := time.Now()

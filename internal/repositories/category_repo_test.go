@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"errors"
 	"regexp"
 	"testing"
@@ -38,7 +39,7 @@ func TestCategoryRepo_FindByID_Found(t *testing.T) {
 		WithArgs("cat-1", 1).
 		WillReturnRows(rows)
 
-	cat, err := repo.FindByID("cat-1")
+	cat, err := repo.FindByID(context.Background(), "cat-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -58,7 +59,7 @@ func TestCategoryRepo_FindByID_NotFound(t *testing.T) {
 		WithArgs("missing", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-	cat, err := repo.FindByID("missing")
+	cat, err := repo.FindByID(context.Background(), "missing")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -79,7 +80,7 @@ func TestCategoryRepo_FindByID_Error(t *testing.T) {
 		WithArgs("cat-err", 1).
 		WillReturnError(dbErr)
 
-	cat, err := repo.FindByID("cat-err")
+	cat, err := repo.FindByID(context.Background(), "cat-err")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -101,7 +102,7 @@ func TestCategoryRepo_FindByCode_Found(t *testing.T) {
 		WithArgs("TEST", 1).
 		WillReturnRows(rows)
 
-	cat, err := repo.FindByCode("TEST")
+	cat, err := repo.FindByCode(context.Background(), "TEST")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -121,7 +122,7 @@ func TestCategoryRepo_FindByCode_NotFound(t *testing.T) {
 		WithArgs("MISSING", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-	cat, err := repo.FindByCode("MISSING")
+	cat, err := repo.FindByCode(context.Background(), "MISSING")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -142,7 +143,7 @@ func TestCategoryRepo_FindByCode_Error(t *testing.T) {
 		WithArgs("CODE", 1).
 		WillReturnError(dbErr)
 
-	_, err := repo.FindByCode("CODE")
+	_, err := repo.FindByCode(context.Background(), "CODE")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -161,7 +162,7 @@ func TestCategoryRepo_Create(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("cat-new"))
 	mock.ExpectCommit()
 
-	result, err := repo.Create(cat)
+	result, err := repo.Create(context.Background(), cat)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -183,7 +184,7 @@ func TestCategoryRepo_Create_Error(t *testing.T) {
 		WillReturnError(errors.New("insert error"))
 	mock.ExpectRollback()
 
-	result, err := repo.Create(cat)
+	result, err := repo.Create(context.Background(), cat)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -205,7 +206,7 @@ func TestCategoryRepo_Update(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	err := repo.Update(cat)
+	err := repo.Update(context.Background(), cat)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -227,7 +228,7 @@ func TestCategoryRepo_List_NoFilter(t *testing.T) {
 		WithArgs(10).
 		WillReturnRows(rows)
 
-	cats, total, err := repo.List(CategoryFilter{}, 0, 10)
+	cats, total, err := repo.List(context.Background(), CategoryFilter{}, 0, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -255,7 +256,7 @@ func TestCategoryRepo_List_WithSearch(t *testing.T) {
 		WithArgs("%test%", "%test%", 10).
 		WillReturnRows(rows)
 
-	cats, total, err := repo.List(CategoryFilter{Search: "test"}, 0, 10)
+	cats, total, err := repo.List(context.Background(), CategoryFilter{Search: "test"}, 0, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -277,7 +278,7 @@ func TestCategoryRepo_List_CountError(t *testing.T) {
 	dbErr := errors.New("count error")
 	mock.ExpectQuery(`SELECT count\(\*\) FROM "categories"`).WillReturnError(dbErr)
 
-	_, _, err := repo.List(CategoryFilter{}, 0, 10)
+	_, _, err := repo.List(context.Background(), CategoryFilter{}, 0, 10)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -296,7 +297,7 @@ func TestCategoryRepo_List_FindError(t *testing.T) {
 	dbErr := errors.New("find error")
 	mock.ExpectQuery(`SELECT \* FROM "categories"`).WillReturnError(dbErr)
 
-	_, _, err := repo.List(CategoryFilter{}, 0, 10)
+	_, _, err := repo.List(context.Background(), CategoryFilter{}, 0, 10)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -315,7 +316,7 @@ func TestCategoryRepo_SoftDelete(t *testing.T) {
 		WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	err := repo.SoftDelete("cat-1", "user-1")
+	err := repo.SoftDelete(context.Background(), "cat-1", "user-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
