@@ -8,6 +8,92 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
 </head>
+<script>
+(function () {
+  function showCitizenToast(message, type) {
+    const oldToast = document.getElementById("citizen-realtime-toast");
+    if (oldToast) {
+      oldToast.remove();
+    }
+
+    const isSuccess = type === "success";
+
+    const toast = document.createElement("div");
+    toast.id = "citizen-realtime-toast";
+    toast.className = [
+      "fixed right-4 top-4 z-50 w-[min(24rem,calc(100vw-2rem))]",
+      "rounded-lg border bg-white shadow-lg transition-opacity duration-300",
+      isSuccess ? "border-green-200" : "border-blue-200"
+    ].join(" ");
+
+    toast.setAttribute("role", "status");
+    toast.setAttribute("aria-live", "polite");
+
+    toast.innerHTML = `
+      <div class="flex items-start gap-3 p-4">
+        <div class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${isSuccess ? "bg-green-50 text-green-600" : "bg-blue-50 text-blue-600"}">
+          <i data-lucide="${isSuccess ? "check" : "bell"}" class="h-4 w-4"></i>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-medium text-gray-900">
+            Thông báo mới
+          </div>
+          <div class="mt-1 text-sm text-gray-600">
+            ${message}
+          </div>
+        </div>
+        <button type="button"
+                class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                aria-label="Close">
+          <i data-lucide="x" class="h-4 w-4"></i>
+        </button>
+      </div>
+    `;
+
+    toast.querySelector("button").addEventListener("click", function () {
+      toast.remove();
+    });
+
+    document.body.appendChild(toast);
+
+    if (window.lucide) {
+      lucide.createIcons();
+    }
+
+    window.setTimeout(function () {
+      toast.classList.add("opacity-0");
+      window.setTimeout(function () {
+        if (toast.parentNode) {
+          toast.remove();
+        }
+      }, 300);
+    }, 4000);
+  }
+
+  const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(`${protocol}://${window.location.host}/citizen/ws/notifications`);
+
+  ws.onmessage = function (event) {
+    try {
+      const data = JSON.parse(event.data);
+
+      if (data.type === "application_status_changed") {
+        window.dispatchEvent(new CustomEvent("application-status-changed", {
+          detail: data
+        }));
+
+        showCitizenToast(data.message || "Hồ sơ của bạn vừa được cập nhật.", "success");
+      }
+    } catch (err) {
+      console.error("Invalid websocket message", err);
+    }
+  };
+
+  ws.onclose = function () {
+    console.log("WebSocket disconnected");
+  };
+})();
+</script>
 <body class="min-h-screen bg-gray-50 font-sans text-gray-900">
   {{ template "citizen/partials/toast.html" . }}
   {{ if .FullPage }}
