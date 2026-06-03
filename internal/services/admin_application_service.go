@@ -9,6 +9,7 @@ import (
 
 	"github.com/awesome-academy/golang_baoan_thao/internal/configs"
 	"github.com/awesome-academy/golang_baoan_thao/internal/models"
+	"github.com/awesome-academy/golang_baoan_thao/internal/realtime"
 	"github.com/awesome-academy/golang_baoan_thao/internal/repositories"
 	"github.com/awesome-academy/golang_baoan_thao/internal/utils"
 )
@@ -18,6 +19,10 @@ var ErrAdminApplicationInvalidTransition = errors.New("application.invalid_trans
 var ErrAdminApplicationRejectReasonRequired = errors.New("application.reject_reason_required")
 var ErrAdminApplicationNeedMoreInfoNoteRequired = errors.New("application.need_more_info_note_required")
 
+type RealtimeNotifier interface {
+	SendToUser(userID string, msg realtime.Message)
+}
+
 type AdminApplicationService struct {
 	appRepo          repositories.ApplicationRepository
 	assignService    *ApplicationAssignmentService
@@ -25,6 +30,7 @@ type AdminApplicationService struct {
 	activityLogger   activityLogger
 	notificationRepo repositories.NotificationRepository
 	mailer           Mailer
+	realTimeNotifier RealtimeNotifier
 }
 
 func NewAdminApplicationService(appRepo repositories.ApplicationRepository, assignService *ApplicationAssignmentService, storage utils.FileStorage, loggers ...activityLogger) *AdminApplicationService {
@@ -42,6 +48,11 @@ func (s *AdminApplicationService) WithNotificationRepo(repo repositories.Notific
 
 func (s *AdminApplicationService) WithMailer(mailer Mailer) *AdminApplicationService {
 	s.mailer = mailer
+	return s
+}
+
+func (s *AdminApplicationService) WithRealtimeNotifier(notifier RealtimeNotifier) *AdminApplicationService {
+	s.realTimeNotifier = notifier
 	return s
 }
 
@@ -160,8 +171,45 @@ func (s *AdminApplicationService) ProcessApplication(applicationID string, newSt
 
 	s.notifyCitizenStatusChange(app, newStatus, note, now)
 	s.sendCitizenStatusChangeEmail(app, newStatus, note, savedURLs)
+	s.notifyCitizenStatusChangeRealtime(app, newStatus, note)
 
 	return nil
+}
+
+func (s *AdminApplicationService) notifyCitizenStatusChangeRealtime(app *models.Application, newStatus models.ApplicationStatus, note string) {
+	if s.realTimeNotifier == nil || app == nil {
+		return
+	}
+
+	params := map[string]string{
+		"code":    app.ApplicationCode,
+		"service": app.ServiceType.Name,
+		"note":    strings.TrimSpace(note),
+	}
+
+	var messageKey string
+
+	switch newStatus {
+	case models.ApplicationStatusProcessing:
+		messageKey = "notification.processing.message"
+	case models.ApplicationStatusNeedMoreInfo:
+		messageKey = "notification.need_more_info.message"
+	case models.ApplicationStatusApproved:
+		messageKey = "notification.approved.message"
+	case models.ApplicationStatusRejected:
+		messageKey = "notification.rejected.message"
+	default:
+		return
+	}
+
+	s.realTimeNotifier.SendToUser(app.CitizenUserID, realtime.Message{
+		Type:            "application_status_changed",
+		UserID:          app.CitizenUserID,
+		ApplicationID:   app.ID,
+		ApplicationCode: app.ApplicationCode,
+		Status:          string(newStatus),
+		Message:         configs.TLang(configs.DefaultLocale, messageKey, params),
+	})
 }
 
 func (s *AdminApplicationService) sendCitizenStatusChangeEmail(app *models.Application, newStatus models.ApplicationStatus, note string, attachmentURLs []string) {

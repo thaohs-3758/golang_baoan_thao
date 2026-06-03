@@ -26,6 +26,7 @@ type ApiHandler struct {
 	ApplicationHandler      *handlers.ApplicationHandler
 	NotificationHandler     *handlers.NotificationHandler
 	CitizenWebHandler       *handlers.CitizenWebHandler
+	RealtimeHandler         *handlers.RealtimeHandler
 }
 
 func SetupRoutes(e *echo.Echo, handler *ApiHandler) {
@@ -203,6 +204,7 @@ func SetupRoutes(e *echo.Echo, handler *ApiHandler) {
 	citizen.GET("/me/notifications", handler.NotificationHandler.List)
 	citizen.PUT("/me/notifications/read-all", handler.NotificationHandler.MarkAllAsRead)
 	citizen.PUT("/me/notifications/:id/read", handler.NotificationHandler.MarkAsRead)
+	citizenWeb.GET("/ws/notifications", handler.RealtimeHandler.CitizenNotifications)
 
 	staff := api.Group("/staff")
 	staff.Use(middlewares.JWTMiddleware)
