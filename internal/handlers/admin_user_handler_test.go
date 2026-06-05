@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
@@ -868,30 +869,38 @@ type fakeDeptRepoForUser struct {
 	depts []models.Department
 }
 
-func (r *fakeDeptRepoForUser) FindByID(_ string) (*models.Department, error) { return nil, nil }
-func (r *fakeDeptRepoForUser) FindByCode(_ string) (*models.Department, error) { return nil, nil }
-func (r *fakeDeptRepoForUser) FindByLeaderUserID(_ string) (*models.Department, error) {
+func (r *fakeDeptRepoForUser) FindByID(_ context.Context, _ string) (*models.Department, error) {
 	return nil, nil
 }
-func (r *fakeDeptRepoForUser) Create(d *models.Department) (*models.Department, error) {
+func (r *fakeDeptRepoForUser) FindByCode(_ context.Context, _ string) (*models.Department, error) {
+	return nil, nil
+}
+func (r *fakeDeptRepoForUser) FindByLeaderUserID(_ context.Context, _ string) (*models.Department, error) {
+	return nil, nil
+}
+func (r *fakeDeptRepoForUser) Create(_ context.Context, d *models.Department) (*models.Department, error) {
 	return d, nil
 }
 func (r *fakeDeptRepoForUser) CreateInTx(_ *gorm.DB, _ *models.Department) error { return nil }
-func (r *fakeDeptRepoForUser) Update(_ *models.Department) error                  { return nil }
-func (r *fakeDeptRepoForUser) List(_ repositories.DepartmentFilter, _, _ int) ([]models.Department, int64, error) {
+func (r *fakeDeptRepoForUser) Update(_ context.Context, _ *models.Department) error {
+	return nil
+}
+func (r *fakeDeptRepoForUser) List(_ context.Context, _ repositories.DepartmentFilter, _, _ int) ([]models.Department, int64, error) {
 	return r.depts, int64(len(r.depts)), nil
 }
-func (r *fakeDeptRepoForUser) SoftDelete(_ string, _ string) error { return nil }
+func (r *fakeDeptRepoForUser) SoftDelete(_ context.Context, _ string, _ string) error {
+	return nil
+}
 
 var _ repositories.DepartmentRepository = (*fakeDeptRepoForUser)(nil)
 
 // --- fakeStaffProfileRepo for WithDeptAndStaffRepos tests ---
 
 type fakeStaffProfileRepo struct {
-	profile    *models.StaffProfile
-	findErr    error
-	createErr  error
-	updateErr  error
+	profile   *models.StaffProfile
+	findErr   error
+	createErr error
+	updateErr error
 }
 
 func (r *fakeStaffProfileRepo) FindByUserID(_ string) (*models.StaffProfile, error) {

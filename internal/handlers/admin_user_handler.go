@@ -111,13 +111,13 @@ func (h *AdminUserHandler) ListUsers(c *echo.Context) error {
 	}
 
 	data := map[string]interface{}{
-		"Title":        configs.T(c, "ui.users.title", nil),
-		"CurrentPath":  "/admin/users",
-		"CurrentUser":  adminCurrentUser(c),
-		"Users":        users,
-		"Pagination":   utils.NewPagination(page, limit, total),
-		"Search":       search,
-		"RoleFilter":   role,
+		"Title":          configs.T(c, "ui.users.title", nil),
+		"CurrentPath":    "/admin/users",
+		"CurrentUser":    adminCurrentUser(c),
+		"Users":          users,
+		"Pagination":     utils.NewPagination(page, limit, total),
+		"Search":         search,
+		"RoleFilter":     role,
 		"ImportAction":   "/admin/users/import",
 		"TemplateAction": "/admin/users/template",
 		"Flash":          flashFromQuery(c),
@@ -187,7 +187,7 @@ func (h *AdminUserHandler) ShowEditForm(c *echo.Context) error {
 
 	var depts []models.Department
 	if h.deptRepo != nil {
-		depts, _, _ = h.deptRepo.List(repositories.DepartmentFilter{}, 0, 1000)
+		depts, _, _ = h.deptRepo.List(c.Request().Context(), repositories.DepartmentFilter{}, 0, 1000)
 	}
 
 	currentDeptID := ""

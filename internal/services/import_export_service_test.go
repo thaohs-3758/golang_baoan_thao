@@ -19,16 +19,26 @@ type fakeIEDeptRepo struct {
 	createErr error
 }
 
-func (r *fakeIEDeptRepo) FindByID(_ string) (*models.Department, error)       { return nil, nil }
-func (r *fakeIEDeptRepo) FindByCode(_ string) (*models.Department, error)     { return nil, nil }
-func (r *fakeIEDeptRepo) FindByLeaderUserID(_ string) (*models.Department, error) { return nil, nil }
-func (r *fakeIEDeptRepo) Create(d *models.Department) (*models.Department, error) { return d, nil }
-func (r *fakeIEDeptRepo) CreateInTx(_ *gorm.DB, _ *models.Department) error   { return r.createErr }
-func (r *fakeIEDeptRepo) Update(_ *models.Department) error                   { return nil }
-func (r *fakeIEDeptRepo) List(_ repositories.DepartmentFilter, _, _ int) ([]models.Department, int64, error) {
+func (r *fakeIEDeptRepo) FindByID(_ context.Context, _ string) (*models.Department, error) {
+	return nil, nil
+}
+func (r *fakeIEDeptRepo) FindByCode(_ context.Context, _ string) (*models.Department, error) {
+	return nil, nil
+}
+func (r *fakeIEDeptRepo) FindByLeaderUserID(_ context.Context, _ string) (*models.Department, error) {
+	return nil, nil
+}
+func (r *fakeIEDeptRepo) Create(_ context.Context, d *models.Department) (*models.Department, error) {
+	return d, nil
+}
+func (r *fakeIEDeptRepo) CreateInTx(_ *gorm.DB, _ *models.Department) error { return r.createErr }
+func (r *fakeIEDeptRepo) Update(_ context.Context, _ *models.Department) error {
+	return nil
+}
+func (r *fakeIEDeptRepo) List(_ context.Context, _ repositories.DepartmentFilter, _, _ int) ([]models.Department, int64, error) {
 	return nil, 0, nil
 }
-func (r *fakeIEDeptRepo) SoftDelete(_ string, _ string) error { return nil }
+func (r *fakeIEDeptRepo) SoftDelete(_ context.Context, _ string, _ string) error { return nil }
 
 var _ repositories.DepartmentRepository = (*fakeIEDeptRepo)(nil)
 
@@ -36,11 +46,11 @@ type fakeIEUserRepo struct {
 	createErr error
 }
 
-func (r *fakeIEUserRepo) FindByEmail(_ string) (*models.User, error)         { return nil, nil }
-func (r *fakeIEUserRepo) FindByID(_ string) (*models.User, error)            { return nil, nil }
-func (r *fakeIEUserRepo) Create(u *models.User) (*models.User, error)        { return u, nil }
-func (r *fakeIEUserRepo) CreateInTx(_ *gorm.DB, _ *models.User) error       { return r.createErr }
-func (r *fakeIEUserRepo) Update(_ *models.User) error                        { return nil }
+func (r *fakeIEUserRepo) FindByEmail(_ string) (*models.User, error)  { return nil, nil }
+func (r *fakeIEUserRepo) FindByID(_ string) (*models.User, error)     { return nil, nil }
+func (r *fakeIEUserRepo) Create(u *models.User) (*models.User, error) { return u, nil }
+func (r *fakeIEUserRepo) CreateInTx(_ *gorm.DB, _ *models.User) error { return r.createErr }
+func (r *fakeIEUserRepo) Update(_ *models.User) error                 { return nil }
 func (r *fakeIEUserRepo) List(_ repositories.UserFilter, _, _ int) ([]models.User, int64, error) {
 	return nil, 0, nil
 }
@@ -53,9 +63,11 @@ type fakeIEProfileRepo struct {
 	createErr error
 }
 
-func (r *fakeIEProfileRepo) GetByUserID(_ string) (*models.CitizenProfile, error)    { return nil, nil }
-func (r *fakeIEProfileRepo) Update(_ *models.CitizenProfile) error                   { return nil }
-func (r *fakeIEProfileRepo) CreateInTx(_ *gorm.DB, _ *models.CitizenProfile) error  { return r.createErr }
+func (r *fakeIEProfileRepo) GetByUserID(_ string) (*models.CitizenProfile, error) { return nil, nil }
+func (r *fakeIEProfileRepo) Update(_ *models.CitizenProfile) error                { return nil }
+func (r *fakeIEProfileRepo) CreateInTx(_ *gorm.DB, _ *models.CitizenProfile) error {
+	return r.createErr
+}
 func (r *fakeIEProfileRepo) FindByCitizenIDNumber(_ string) (*models.CitizenProfile, error) {
 	return nil, nil
 }
@@ -405,6 +417,6 @@ type fakeIEDeptRepoWithFindByCodeErr struct {
 	err error
 }
 
-func (r *fakeIEDeptRepoWithFindByCodeErr) FindByCode(_ string) (*models.Department, error) {
+func (r *fakeIEDeptRepoWithFindByCodeErr) FindByCode(_ context.Context, _ string) (*models.Department, error) {
 	return nil, r.err
 }

@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -39,11 +40,11 @@ type fakeStaffUserRepo struct {
 	users map[string]*models.User
 }
 
-func (r *fakeStaffUserRepo) FindByID(id string) (*models.User, error) { return r.users[id], nil }
-func (r *fakeStaffUserRepo) FindByEmail(_ string) (*models.User, error) { return nil, nil }
+func (r *fakeStaffUserRepo) FindByID(id string) (*models.User, error)    { return r.users[id], nil }
+func (r *fakeStaffUserRepo) FindByEmail(_ string) (*models.User, error)  { return nil, nil }
 func (r *fakeStaffUserRepo) Create(u *models.User) (*models.User, error) { return u, nil }
 func (r *fakeStaffUserRepo) CreateInTx(_ *gorm.DB, _ *models.User) error { return nil }
-func (r *fakeStaffUserRepo) Update(_ *models.User) error { return nil }
+func (r *fakeStaffUserRepo) Update(_ *models.User) error                 { return nil }
 func (r *fakeStaffUserRepo) List(_ repositories.UserFilter, _, _ int) ([]models.User, int64, error) {
 	return nil, 0, nil
 }
@@ -55,20 +56,28 @@ type fakeStaffDepartmentRepo struct {
 	err  error
 }
 
-func (r *fakeStaffDepartmentRepo) FindByID(_ string) (*models.Department, error) { return nil, nil }
-func (r *fakeStaffDepartmentRepo) FindByCode(_ string) (*models.Department, error) { return nil, nil }
-func (r *fakeStaffDepartmentRepo) FindByLeaderUserID(_ string) (*models.Department, error) {
+func (r *fakeStaffDepartmentRepo) FindByID(_ context.Context, _ string) (*models.Department, error) {
+	return nil, nil
+}
+func (r *fakeStaffDepartmentRepo) FindByCode(_ context.Context, _ string) (*models.Department, error) {
+	return nil, nil
+}
+func (r *fakeStaffDepartmentRepo) FindByLeaderUserID(_ context.Context, _ string) (*models.Department, error) {
 	return r.dept, r.err
 }
-func (r *fakeStaffDepartmentRepo) Create(d *models.Department) (*models.Department, error) {
+func (r *fakeStaffDepartmentRepo) Create(_ context.Context, d *models.Department) (*models.Department, error) {
 	return d, nil
 }
 func (r *fakeStaffDepartmentRepo) CreateInTx(_ *gorm.DB, _ *models.Department) error { return nil }
-func (r *fakeStaffDepartmentRepo) Update(_ *models.Department) error                  { return nil }
-func (r *fakeStaffDepartmentRepo) List(_ repositories.DepartmentFilter, _, _ int) ([]models.Department, int64, error) {
+func (r *fakeStaffDepartmentRepo) Update(_ context.Context, _ *models.Department) error {
+	return nil
+}
+func (r *fakeStaffDepartmentRepo) List(_ context.Context, _ repositories.DepartmentFilter, _, _ int) ([]models.Department, int64, error) {
 	return nil, 0, nil
 }
-func (r *fakeStaffDepartmentRepo) SoftDelete(_ string, _ string) error { return nil }
+func (r *fakeStaffDepartmentRepo) SoftDelete(_ context.Context, _ string, _ string) error {
+	return nil
+}
 
 var _ repositories.DepartmentRepository = (*fakeStaffDepartmentRepo)(nil)
 

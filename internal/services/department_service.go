@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"log"
 	"time"
@@ -30,11 +31,11 @@ func NewDepartmentService(repo repositories.DepartmentRepository, staffRepo repo
 
 func (s *DepartmentService) ListDepartments(filter repositories.DepartmentFilter, page, limit int) ([]models.Department, int64, error) {
 	offset := (page - 1) * limit
-	return s.repo.List(filter, offset, limit)
+	return s.repo.List(context.Background(), filter, offset, limit)
 }
 
 func (s *DepartmentService) GetDepartment(id string) (*models.Department, error) {
-	dept, err := s.repo.FindByID(id)
+	dept, err := s.repo.FindByID(context.Background(), id)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +46,7 @@ func (s *DepartmentService) GetDepartment(id string) (*models.Department, error)
 }
 
 func (s *DepartmentService) CreateDepartment(req *dtos.DepartmentCreateRequest, createdBy string) (*models.Department, error) {
-	existing, err := s.repo.FindByCode(req.Code)
+	existing, err := s.repo.FindByCode(context.Background(), req.Code)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +63,7 @@ func (s *DepartmentService) CreateDepartment(req *dtos.DepartmentCreateRequest, 
 		UpdatedAt: now,
 	}
 	if req.LeaderUserID != "" {
-		leaderDept, err := s.repo.FindByLeaderUserID(req.LeaderUserID)
+		leaderDept, err := s.repo.FindByLeaderUserID(context.Background(), req.LeaderUserID)
 		if err != nil {
 			return nil, err
 		}
@@ -72,7 +73,7 @@ func (s *DepartmentService) CreateDepartment(req *dtos.DepartmentCreateRequest, 
 		dept.LeaderUserID = &req.LeaderUserID
 	}
 
-	created, err := s.repo.Create(dept)
+	created, err := s.repo.Create(context.Background(), dept)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +96,7 @@ func (s *DepartmentService) CreateDepartment(req *dtos.DepartmentCreateRequest, 
 }
 
 func (s *DepartmentService) UpdateDepartment(id string, req *dtos.DepartmentUpdateRequest, updatedBy string) (*models.Department, error) {
-	dept, err := s.repo.FindByID(id)
+	dept, err := s.repo.FindByID(context.Background(), id)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +108,7 @@ func (s *DepartmentService) UpdateDepartment(id string, req *dtos.DepartmentUpda
 	prevAddress := dept.Address
 
 	if req.Code != dept.Code {
-		existing, err := s.repo.FindByCode(req.Code)
+		existing, err := s.repo.FindByCode(context.Background(), req.Code)
 		if err != nil {
 			return nil, err
 		}
@@ -123,7 +124,7 @@ func (s *DepartmentService) UpdateDepartment(id string, req *dtos.DepartmentUpda
 
 	prevLeaderID := dept.LeaderUserID
 	if req.LeaderUserID != "" {
-		leaderDept, err := s.repo.FindByLeaderUserID(req.LeaderUserID)
+		leaderDept, err := s.repo.FindByLeaderUserID(context.Background(), req.LeaderUserID)
 		if err != nil {
 			return nil, err
 		}
@@ -135,7 +136,7 @@ func (s *DepartmentService) UpdateDepartment(id string, req *dtos.DepartmentUpda
 		dept.LeaderUserID = nil
 	}
 
-	if err := s.repo.Update(dept); err != nil {
+	if err := s.repo.Update(context.Background(), dept); err != nil {
 		return nil, err
 	}
 	if s.staffRepo != nil {
@@ -174,14 +175,14 @@ func (s *DepartmentService) UpdateDepartment(id string, req *dtos.DepartmentUpda
 }
 
 func (s *DepartmentService) DeleteDepartment(id string, deletedBy string) error {
-	dept, err := s.repo.FindByID(id)
+	dept, err := s.repo.FindByID(context.Background(), id)
 	if err != nil {
 		return err
 	}
 	if dept == nil {
 		return ErrDepartmentNotFound
 	}
-	if err := s.repo.SoftDelete(id, deletedBy); err != nil {
+	if err := s.repo.SoftDelete(context.Background(), id, deletedBy); err != nil {
 		return err
 	}
 	now := time.Now()

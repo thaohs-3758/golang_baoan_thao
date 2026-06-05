@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -14,28 +15,28 @@ import (
 // --- fakeDepartmentRepo ---
 
 type fakeDepartmentRepo struct {
-	dept      *models.Department
-	depts     []models.Department
-	total     int64
-	findErr   error
-	codeErr   error
-	codeDept  *models.Department
+	dept       *models.Department
+	depts      []models.Department
+	total      int64
+	findErr    error
+	codeErr    error
+	codeDept   *models.Department
 	leaderDept *models.Department
-	createErr error
-	updateErr error
-	deleteErr error
+	createErr  error
+	updateErr  error
+	deleteErr  error
 }
 
-func (r *fakeDepartmentRepo) FindByID(_ string) (*models.Department, error) {
+func (r *fakeDepartmentRepo) FindByID(_ context.Context, _ string) (*models.Department, error) {
 	return r.dept, r.findErr
 }
-func (r *fakeDepartmentRepo) FindByCode(_ string) (*models.Department, error) {
+func (r *fakeDepartmentRepo) FindByCode(_ context.Context, _ string) (*models.Department, error) {
 	return r.codeDept, r.codeErr
 }
-func (r *fakeDepartmentRepo) FindByLeaderUserID(_ string) (*models.Department, error) {
+func (r *fakeDepartmentRepo) FindByLeaderUserID(_ context.Context, _ string) (*models.Department, error) {
 	return r.leaderDept, r.findErr
 }
-func (r *fakeDepartmentRepo) Create(d *models.Department) (*models.Department, error) {
+func (r *fakeDepartmentRepo) Create(_ context.Context, d *models.Department) (*models.Department, error) {
 	if r.createErr != nil {
 		return nil, r.createErr
 	}
@@ -44,14 +45,18 @@ func (r *fakeDepartmentRepo) Create(d *models.Department) (*models.Department, e
 	}
 	return d, nil
 }
-func (r *fakeDepartmentRepo) Update(_ *models.Department) error { return r.updateErr }
-func (r *fakeDepartmentRepo) List(_ repositories.DepartmentFilter, _, _ int) ([]models.Department, int64, error) {
+func (r *fakeDepartmentRepo) Update(_ context.Context, _ *models.Department) error {
+	return r.updateErr
+}
+func (r *fakeDepartmentRepo) List(_ context.Context, _ repositories.DepartmentFilter, _, _ int) ([]models.Department, int64, error) {
 	if r.findErr != nil {
 		return nil, 0, r.findErr
 	}
 	return r.depts, r.total, nil
 }
-func (r *fakeDepartmentRepo) SoftDelete(_ string, _ string) error { return r.deleteErr }
+func (r *fakeDepartmentRepo) SoftDelete(_ context.Context, _ string, _ string) error {
+	return r.deleteErr
+}
 func (r *fakeDepartmentRepo) CreateInTx(_ *gorm.DB, d *models.Department) error {
 	if r.createErr != nil {
 		return r.createErr
@@ -69,7 +74,7 @@ type fakeStaffRepo struct {
 	updateErr error
 }
 
-func (r *fakeStaffRepo) FindByUserID(_ string) (*models.StaffProfile, error)           { return nil, nil }
+func (r *fakeStaffRepo) FindByUserID(_ string) (*models.StaffProfile, error) { return nil, nil }
 func (r *fakeStaffRepo) ListByDepartment(_ string, _, _ int) ([]models.StaffProfile, int64, error) {
 	return nil, 0, nil
 }
@@ -80,8 +85,8 @@ func (r *fakeStaffRepo) UpdateDepartment(userID string, deptID *string, _ string
 	}{userID: userID, deptID: deptID})
 	return r.updateErr
 }
-func (r *fakeStaffRepo) Create(p *models.StaffProfile) (*models.StaffProfile, error)  { return p, nil }
-func (r *fakeStaffRepo) CreateInTx(_ *gorm.DB, _ *models.StaffProfile) error          { return nil }
+func (r *fakeStaffRepo) Create(p *models.StaffProfile) (*models.StaffProfile, error) { return p, nil }
+func (r *fakeStaffRepo) CreateInTx(_ *gorm.DB, _ *models.StaffProfile) error         { return nil }
 
 var _ repositories.StaffProfileRepository = (*fakeStaffRepo)(nil)
 

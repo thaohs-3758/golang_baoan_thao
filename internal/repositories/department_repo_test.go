@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"errors"
 	"regexp"
 	"testing"
@@ -42,7 +43,7 @@ func TestDeptRepo_FindByID_Found(t *testing.T) {
 	// Preload LeaderUser (no leader_user_id so no preload query needed, but GORM still issues it)
 	mock.ExpectQuery(`SELECT \* FROM "users"`).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-	dept, err := repo.FindByID("d1")
+	dept, err := repo.FindByID(context.Background(), "d1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -59,7 +60,7 @@ func TestDeptRepo_FindByID_NotFound(t *testing.T) {
 		WithArgs("missing", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-	dept, err := repo.FindByID("missing")
+	dept, err := repo.FindByID(context.Background(), "missing")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -77,7 +78,7 @@ func TestDeptRepo_FindByID_DBError(t *testing.T) {
 		WithArgs("d1", 1).
 		WillReturnError(dbErr)
 
-	_, err := repo.FindByID("d1")
+	_, err := repo.FindByID(context.Background(), "d1")
 	if !errors.Is(err, dbErr) {
 		t.Fatalf("expected db error, got %v", err)
 	}
@@ -92,7 +93,7 @@ func TestDeptRepo_FindByCode_Found(t *testing.T) {
 		WithArgs("IT001", 1).
 		WillReturnRows(rows)
 
-	dept, err := repo.FindByCode("IT001")
+	dept, err := repo.FindByCode(context.Background(), "IT001")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -109,7 +110,7 @@ func TestDeptRepo_FindByCode_NotFound(t *testing.T) {
 		WithArgs("NOPE", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-	dept, err := repo.FindByCode("NOPE")
+	dept, err := repo.FindByCode(context.Background(), "NOPE")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -127,7 +128,7 @@ func TestDeptRepo_FindByCode_DBError(t *testing.T) {
 		WithArgs("IT", 1).
 		WillReturnError(dbErr)
 
-	_, err := repo.FindByCode("IT")
+	_, err := repo.FindByCode(context.Background(), "IT")
 	if !errors.Is(err, dbErr) {
 		t.Fatalf("expected db error, got %v", err)
 	}
@@ -143,7 +144,7 @@ func TestDeptRepo_Create_OK(t *testing.T) {
 	mock.ExpectCommit()
 
 	dept := &models.Department{Name: "IT", Code: "IT001"}
-	created, err := repo.Create(dept)
+	created, err := repo.Create(context.Background(), dept)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -164,7 +165,7 @@ func TestDeptRepo_Create_DBError(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO "departments"`).WillReturnError(dbErr)
 	mock.ExpectRollback()
 
-	_, err := repo.Create(&models.Department{Name: "IT", Code: "IT001"})
+	_, err := repo.Create(context.Background(), &models.Department{Name: "IT", Code: "IT001"})
 	if !errors.Is(err, dbErr) {
 		t.Fatalf("expected insert error, got %v", err)
 	}
@@ -178,7 +179,7 @@ func TestDeptRepo_Update_OK(t *testing.T) {
 	mock.ExpectExec(`UPDATE "departments"`).WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	err := repo.Update(&models.Department{ID: "d1", Name: "Updated", Code: "UPD"})
+	err := repo.Update(context.Background(), &models.Department{ID: "d1", Name: "Updated", Code: "UPD"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -193,7 +194,7 @@ func TestDeptRepo_Update_DBError(t *testing.T) {
 	mock.ExpectExec(`UPDATE "departments"`).WillReturnError(dbErr)
 	mock.ExpectRollback()
 
-	err := repo.Update(&models.Department{ID: "d1", Name: "X", Code: "X"})
+	err := repo.Update(context.Background(), &models.Department{ID: "d1", Name: "X", Code: "X"})
 	if !errors.Is(err, dbErr) {
 		t.Fatalf("expected db error, got %v", err)
 	}
@@ -213,7 +214,7 @@ func TestDeptRepo_List_OK(t *testing.T) {
 
 	mock.ExpectQuery(`SELECT \* FROM "users"`).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-	depts, total, err := repo.List(DepartmentFilter{}, 0, 10)
+	depts, total, err := repo.List(context.Background(), DepartmentFilter{}, 0, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -232,7 +233,7 @@ func TestDeptRepo_List_CountError(t *testing.T) {
 	dbErr := errors.New("count error")
 	mock.ExpectQuery(`SELECT count\(\*\) FROM "departments"`).WillReturnError(dbErr)
 
-	_, _, err := repo.List(DepartmentFilter{}, 0, 10)
+	_, _, err := repo.List(context.Background(), DepartmentFilter{}, 0, 10)
 	if !errors.Is(err, dbErr) {
 		t.Fatalf("expected count error, got %v", err)
 	}
@@ -248,7 +249,7 @@ func TestDeptRepo_List_SelectError(t *testing.T) {
 	dbErr := errors.New("select error")
 	mock.ExpectQuery(`SELECT \* FROM "departments"`).WillReturnError(dbErr)
 
-	_, _, err := repo.List(DepartmentFilter{}, 0, 10)
+	_, _, err := repo.List(context.Background(), DepartmentFilter{}, 0, 10)
 	if !errors.Is(err, dbErr) {
 		t.Fatalf("expected select error, got %v", err)
 	}
@@ -262,7 +263,7 @@ func TestDeptRepo_SoftDelete_OK(t *testing.T) {
 	mock.ExpectExec(`UPDATE "departments"`).WillReturnResult(sqlmock.NewResult(1, 1))
 	mock.ExpectCommit()
 
-	err := repo.SoftDelete("d1", "actor")
+	err := repo.SoftDelete(context.Background(), "d1", "actor")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -278,7 +279,7 @@ func TestDeptRepo_FindByLeaderUserID_Found(t *testing.T) {
 		WithArgs("u1", 1).
 		WillReturnRows(rows)
 
-	dept, err := repo.FindByLeaderUserID("u1")
+	dept, err := repo.FindByLeaderUserID(context.Background(), "u1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -295,7 +296,7 @@ func TestDeptRepo_FindByLeaderUserID_NotFound(t *testing.T) {
 		WithArgs("nobody", 1).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-	dept, err := repo.FindByLeaderUserID("nobody")
+	dept, err := repo.FindByLeaderUserID(context.Background(), "nobody")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -313,7 +314,7 @@ func TestDeptRepo_FindByLeaderUserID_DBError(t *testing.T) {
 		WithArgs("u1", 1).
 		WillReturnError(dbErr)
 
-	_, err := repo.FindByLeaderUserID("u1")
+	_, err := repo.FindByLeaderUserID(context.Background(), "u1")
 	if !errors.Is(err, dbErr) {
 		t.Fatalf("expected db error, got %v", err)
 	}
@@ -362,7 +363,7 @@ func TestDeptRepo_List_WithSearch(t *testing.T) {
 	mock.ExpectQuery(`SELECT \* FROM "departments"`).WillReturnRows(dataRows)
 	mock.ExpectQuery(`SELECT \* FROM "users"`).WillReturnRows(sqlmock.NewRows([]string{"id"}))
 
-	depts, total, err := repo.List(DepartmentFilter{Search: "IT"}, 0, 10)
+	depts, total, err := repo.List(context.Background(), DepartmentFilter{Search: "IT"}, 0, 10)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -380,7 +381,7 @@ func TestDeptRepo_SoftDelete_DBError(t *testing.T) {
 	mock.ExpectExec(`UPDATE "departments"`).WillReturnError(dbErr)
 	mock.ExpectRollback()
 
-	err := repo.SoftDelete("d1", "actor")
+	err := repo.SoftDelete(context.Background(), "d1", "actor")
 	if !errors.Is(err, dbErr) {
 		t.Fatalf("expected db error, got %v", err)
 	}
