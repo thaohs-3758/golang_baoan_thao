@@ -1,12 +1,14 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"mime/multipart"
 	"testing"
 	"time"
 
+	"github.com/awesome-academy/golang_baoan_thao/internal/events"
 	"github.com/awesome-academy/golang_baoan_thao/internal/models"
 	"github.com/awesome-academy/golang_baoan_thao/internal/repositories"
 	"github.com/stretchr/testify/assert"
@@ -69,6 +71,16 @@ func newAdminAppSvc(repo *fakeAdminAppRepo) *AdminApplicationService {
 func newAdminAppSvcWithLogger(repo *fakeAdminAppRepo, logger activityLogger) *AdminApplicationService {
 	assignSvc := NewApplicationAssignmentService(repo, &fakeAssignRepo{}, &fakeUserRepoAssign{})
 	return NewAdminApplicationService(repo, assignSvc, nil, logger)
+}
+
+type fakeApplicationEventPublisher struct {
+	err       error
+	published bool
+}
+
+func (p *fakeApplicationEventPublisher) PublishApplicationStatusChanged(_ context.Context, _ events.ApplicationStatusChangedEvent) error {
+	p.published = true
+	return p.err
 }
 
 func TestAdminApplicationService_ListApplications_OK(t *testing.T) {
@@ -312,6 +324,27 @@ func TestAdminApplicationService_ProcessApplication_SendsNotificationApproved(t 
 	assert.True(t, mailer.sent)
 }
 
+func TestAdminApplicationService_ProcessApplication_PublishesEventInsteadOfDirectEmail(t *testing.T) {
+	repo := &fakeAdminAppRepo{app: &models.Application{
+		ID:              "app1",
+		ApplicationCode: "APP-1",
+		Status:          models.ApplicationStatusProcessing,
+		CitizenUser:     models.User{ID: "citizen-1", Email: "citizen@test.com", Name: "Citizen"},
+		ServiceType:     models.ServiceType{Name: "Test Service"},
+	}}
+	publisher := &fakeApplicationEventPublisher{}
+	mailer := &fakeMailer{}
+	svc := newAdminAppSvc(repo).
+		WithMailer(mailer).
+		WithEventPublisher(publisher)
+
+	err := svc.ProcessApplication("app1", models.ApplicationStatusApproved, "Approved", nil, "admin-1")
+
+	assert.NoError(t, err)
+	assert.True(t, publisher.published)
+	assert.False(t, mailer.sent)
+}
+
 func TestAdminApplicationService_ProcessApplication_SendsNotificationRejected(t *testing.T) {
 	repo := &fakeAdminAppRepo{app: &models.Application{
 		ID:              "app1",
@@ -448,8 +481,8 @@ func TestAdminApplicationService_ProcessApplication_ProcessingSecondTime(t *test
 	// processingStartedAt already set — should not overwrite
 	now := time.Now()
 	repo := &fakeAdminAppRepo{app: &models.Application{
-		ID:                 "app1",
-		Status:             models.ApplicationStatusReceived,
+		ID:                  "app1",
+		Status:              models.ApplicationStatusReceived,
 		ProcessingStartedAt: &now,
 	}}
 	svc := newAdminAppSvc(repo)

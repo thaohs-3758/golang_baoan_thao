@@ -13,6 +13,7 @@ import (
 	"github.com/awesome-academy/golang_baoan_thao/internal/docs"
 	"github.com/awesome-academy/golang_baoan_thao/internal/handlers"
 	"github.com/awesome-academy/golang_baoan_thao/internal/middlewares"
+	"github.com/awesome-academy/golang_baoan_thao/internal/queue"
 	"github.com/awesome-academy/golang_baoan_thao/internal/realtime"
 	"github.com/awesome-academy/golang_baoan_thao/internal/repositories"
 	"github.com/awesome-academy/golang_baoan_thao/internal/routes"
@@ -118,6 +119,14 @@ func main() {
 	adminApplicationSvc := services.NewAdminApplicationService(applicationRepo, applicationAssignmentSvc, storage, activityLogSvc).
 		WithNotificationRepo(notificationRepo).
 		WithMailer(mailer).WithRealtimeNotifier(realtimeHub)
+	rabbitConn, err := queue.NewRabbitMQConnection()
+	if err != nil {
+		log.Printf("rabbitmq unavailable: %v", err)
+	} else {
+		eventPublisher := queue.NewRabbitMQPublisher(rabbitConn)
+		adminApplicationSvc = adminApplicationSvc.WithEventPublisher(eventPublisher)
+	}
+	defer rabbitConn.Close()
 	adminApplicationHandler := handlers.NewAdminApplicationHandler(adminApplicationSvc, adminUserSvc, staffProfileSvc)
 
 	baseCategoryRepo := repositories.NewCategoryRepo(db)
