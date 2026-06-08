@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"errors"
 	"log"
 	"mime/multipart"
@@ -8,10 +9,12 @@ import (
 	"time"
 
 	"github.com/awesome-academy/golang_baoan_thao/internal/configs"
+	"github.com/awesome-academy/golang_baoan_thao/internal/events"
 	"github.com/awesome-academy/golang_baoan_thao/internal/models"
 	"github.com/awesome-academy/golang_baoan_thao/internal/realtime"
 	"github.com/awesome-academy/golang_baoan_thao/internal/repositories"
 	"github.com/awesome-academy/golang_baoan_thao/internal/utils"
+	"github.com/google/uuid"
 )
 
 var ErrAdminApplicationNotFound = errors.New("application.not_found")
@@ -23,6 +26,10 @@ type RealtimeNotifier interface {
 	SendToUser(userID string, msg realtime.Message)
 }
 
+type ApplicationEventPublisher interface {
+	PublishApplicationStatusChanged(ctx context.Context, event events.ApplicationStatusChangedEvent) error
+}
+
 type AdminApplicationService struct {
 	appRepo          repositories.ApplicationRepository
 	assignService    *ApplicationAssignmentService
@@ -30,7 +37,9 @@ type AdminApplicationService struct {
 	activityLogger   activityLogger
 	notificationRepo repositories.NotificationRepository
 	mailer           Mailer
+	emailService     *ApplicationEmailService
 	realTimeNotifier RealtimeNotifier
+	eventPublisher   ApplicationEventPublisher
 }
 
 func NewAdminApplicationService(appRepo repositories.ApplicationRepository, assignService *ApplicationAssignmentService, storage utils.FileStorage, loggers ...activityLogger) *AdminApplicationService {
@@ -41,6 +50,11 @@ func NewAdminApplicationService(appRepo repositories.ApplicationRepository, assi
 	return &AdminApplicationService{appRepo: appRepo, assignService: assignService, storage: storage, activityLogger: logger}
 }
 
+func (s *AdminApplicationService) WithEventPublisher(publisher ApplicationEventPublisher) *AdminApplicationService {
+	s.eventPublisher = publisher
+	return s
+}
+
 func (s *AdminApplicationService) WithNotificationRepo(repo repositories.NotificationRepository) *AdminApplicationService {
 	s.notificationRepo = repo
 	return s
@@ -48,6 +62,7 @@ func (s *AdminApplicationService) WithNotificationRepo(repo repositories.Notific
 
 func (s *AdminApplicationService) WithMailer(mailer Mailer) *AdminApplicationService {
 	s.mailer = mailer
+	s.emailService = NewApplicationEmailService(mailer)
 	return s
 }
 
@@ -83,6 +98,7 @@ func (s *AdminApplicationService) ProcessApplication(applicationID string, newSt
 	if err != nil || app == nil {
 		return ErrAdminApplicationNotFound
 	}
+	oldStatus := app.Status
 
 	if !isAllowedAdminTransition(app.Status, newStatus) {
 		return ErrAdminApplicationInvalidTransition
@@ -139,7 +155,7 @@ func (s *AdminApplicationService) ProcessApplication(applicationID string, newSt
 		}
 	}
 
-	if err := s.appRepo.ProcessStatusUpdate(app.ID, &app.Status, newStatus, resultNote, rejectedReason, processingStartedAt, completedAt, processedBy, attachments); err != nil {
+	if err := s.appRepo.ProcessStatusUpdate(app.ID, &oldStatus, newStatus, resultNote, rejectedReason, processingStartedAt, completedAt, processedBy, attachments); err != nil {
 		if s.storage != nil {
 			for _, a := range attachments {
 				_ = s.storage.RemoveFile(a.FileURL)
@@ -170,8 +186,23 @@ func (s *AdminApplicationService) ProcessApplication(applicationID string, newSt
 	})
 
 	s.notifyCitizenStatusChange(app, newStatus, note, now)
-	s.sendCitizenStatusChangeEmail(app, newStatus, note, savedURLs)
 	s.notifyCitizenStatusChangeRealtime(app, newStatus, note)
+
+	event := events.ApplicationStatusChangedEvent{
+		EventID:         uuid.NewString(),
+		ApplicationID:   app.ID,
+		ApplicationCode: app.ApplicationCode,
+		CitizenUserID:   app.CitizenUserID,
+		OldStatus:       string(oldStatus),
+		NewStatus:       string(newStatus),
+		Note:            note,
+		ChangedBy:       processedBy,
+		OccurredAt:      time.Now(),
+	}
+
+	if err := s.eventPublisher.PublishApplicationStatusChanged(context.Background(), event); err != nil {
+		log.Printf("failed to publish application status changed event: %v", err)
+	}
 
 	return nil
 }
@@ -210,58 +241,6 @@ func (s *AdminApplicationService) notifyCitizenStatusChangeRealtime(app *models.
 		Status:          string(newStatus),
 		Message:         configs.TLang(configs.DefaultLocale, messageKey, params),
 	})
-}
-
-func (s *AdminApplicationService) sendCitizenStatusChangeEmail(app *models.Application, newStatus models.ApplicationStatus, note string, attachmentURLs []string) {
-	if s.mailer == nil || app == nil || strings.TrimSpace(app.CitizenUser.Email) == "" {
-		return
-	}
-
-	params := map[string]string{
-		"code":    app.ApplicationCode,
-		"service": app.ServiceType.Name,
-		"note":    strings.TrimSpace(note),
-	}
-
-	var subjectKey, bodyKey string
-	switch newStatus {
-	case models.ApplicationStatusProcessing:
-		subjectKey = "notification.processing.title"
-		bodyKey = "notification.processing.message"
-	case models.ApplicationStatusNeedMoreInfo:
-		subjectKey = "notification.need_more_info.title"
-		bodyKey = "notification.need_more_info.message"
-	case models.ApplicationStatusApproved:
-		subjectKey = "notification.approved.title"
-		bodyKey = "notification.approved.message"
-	case models.ApplicationStatusRejected:
-		subjectKey = "notification.rejected.title"
-		bodyKey = "notification.rejected.message"
-	default:
-		return
-	}
-
-	ccEmail := ""
-	if app.ServiceType.ResponsibleDepartment != nil &&
-		app.ServiceType.ResponsibleDepartment.LeaderUser != nil &&
-		strings.TrimSpace(app.ServiceType.ResponsibleDepartment.LeaderUser.Email) != "" {
-		ccEmail = app.ServiceType.ResponsibleDepartment.LeaderUser.Email
-	}
-
-	subject := configs.TLang(configs.DefaultLocale, subjectKey, params)
-	body := configs.TLang(configs.DefaultLocale, bodyKey, params)
-	if len(attachmentURLs) > 0 {
-		body += "\n\nAttachment URLs:"
-		for _, attachmentURL := range attachmentURLs {
-			if strings.TrimSpace(attachmentURL) == "" {
-				continue
-			}
-			body += "\n- " + attachmentURL
-		}
-	}
-	if err := s.mailer.Send(ccEmail, app.CitizenUser.Email, subject, body); err != nil {
-		log.Printf("send status-change email failed for app %s: %v", app.ID, err)
-	}
 }
 
 func (s *AdminApplicationService) notifyCitizenStatusChange(app *models.Application, newStatus models.ApplicationStatus, note string, now time.Time) {
