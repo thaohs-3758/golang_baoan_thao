@@ -13,6 +13,7 @@
   "auth.invalid_request": "Dữ liệu yêu cầu không hợp lệ",
   "common.internal_error": "Lỗi hệ thống",
   "common.invalid_data": "Dữ liệu không hợp lệ.",
+  "common.too_many_requests": "Bạn gửi quá nhiều yêu cầu. Vui lòng thử lại sau.",
   "service.not_found": "Không tìm thấy dịch vụ công",
   "service_type.not_found": "Không tìm thấy loại dịch vụ",
   "service_type.code_duplicate": "Mã loại dịch vụ đã tồn tại",

@@ -157,6 +157,7 @@ func main() {
 		NotificationHandler:     notificationHandler,
 		CitizenWebHandler:       citizenWebHandler,
 		RealtimeHandler:         realtimeHandler,
+		RateLimitStore:          middlewares.NewRedisRateLimitStore(redisClient),
 	})
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
