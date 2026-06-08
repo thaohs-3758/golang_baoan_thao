@@ -27,6 +27,7 @@ type ApiHandler struct {
 	NotificationHandler     *handlers.NotificationHandler
 	CitizenWebHandler       *handlers.CitizenWebHandler
 	RealtimeHandler         *handlers.RealtimeHandler
+	RateLimitStore          middlewares.RateLimitStore
 }
 
 func SetupRoutes(e *echo.Echo, handler *ApiHandler) {
@@ -34,11 +35,15 @@ func SetupRoutes(e *echo.Echo, handler *ApiHandler) {
 		return c.Redirect(http.StatusSeeOther, "/login")
 	})
 
+	rateLimit := func(cfg middlewares.RateLimitConfig) echo.MiddlewareFunc {
+		return middlewares.RateLimitMiddleware(handler.RateLimitStore, cfg)
+	}
+
 	// Citizen web auth (public)
 	e.GET("/login", handler.CitizenWebHandler.ShowLoginPage)
-	e.POST("/login", handler.CitizenWebHandler.WebLogin)
+	e.POST("/login", handler.CitizenWebHandler.WebLogin, rateLimit(middlewares.AuthLoginRateLimitConfig()))
 	e.GET("/register", handler.CitizenWebHandler.ShowRegisterPage)
-	e.POST("/register", handler.CitizenWebHandler.WebRegister)
+	e.POST("/register", handler.CitizenWebHandler.WebRegister, rateLimit(middlewares.AuthRegisterRateLimitConfig()))
 	e.GET("/logout", handler.CitizenWebHandler.WebLogout)
 
 	// Citizen web routes (protected by cookie auth, role=citizen)
@@ -65,7 +70,7 @@ func SetupRoutes(e *echo.Echo, handler *ApiHandler) {
 
 	// Admin auth (public)
 	e.GET("/admin/login", handler.AdminAuthHandler.ShowLoginPage)
-	e.POST("/admin/login", handler.AdminAuthHandler.WebLogin)
+	e.POST("/admin/login", handler.AdminAuthHandler.WebLogin, rateLimit(middlewares.AuthLoginRateLimitConfig()))
 	e.GET("/admin/logout", handler.AdminAuthHandler.WebLogout)
 	e.GET("/set-locale", handler.AdminAuthHandler.SetLocale)
 
@@ -179,9 +184,9 @@ func SetupRoutes(e *echo.Echo, handler *ApiHandler) {
 	api := e.Group("/api")
 
 	auth := api.Group("/auth")
-	auth.POST("/login", handler.AuthHandler.Login)
-	auth.POST("/register", handler.AuthHandler.Register)
-	auth.POST("/refresh", handler.AuthHandler.RefreshTokenHandler)
+	auth.POST("/login", handler.AuthHandler.Login, rateLimit(middlewares.AuthLoginRateLimitConfig()))
+	auth.POST("/register", handler.AuthHandler.Register, rateLimit(middlewares.AuthRegisterRateLimitConfig()))
+	auth.POST("/refresh", handler.AuthHandler.RefreshTokenHandler, rateLimit(middlewares.AuthRefreshRateLimitConfig()))
 	auth.POST("/logout", handler.AuthHandler.Logout)
 
 	citizen := api.Group("/citizens")

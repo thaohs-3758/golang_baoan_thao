@@ -34,6 +34,7 @@
   "auth.invalid_request": "Invalid request data",
   "common.internal_error": "Internal server error",
   "common.invalid_data": "The submitted data is invalid.",
+  "common.too_many_requests": "Too many requests. Please try again later.",
   "service.not_found": "Service not found",
   "service_type.not_found": "Service type not found",
   "service_type.code_duplicate": "Service type code already exists",
