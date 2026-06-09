@@ -23,6 +23,23 @@ func (c *RabbitMQConsumer) ConsumeApplicationStatusChanged(
 	queueName string,
 	handler MessageHandler,
 ) error {
+	return c.consumeTopic(ctx, queueName, events.ApplicationStatusChanged, handler)
+}
+
+func (c *RabbitMQConsumer) ConsumeApplicationDeadlineReminder(
+	ctx context.Context,
+	queueName string,
+	handler MessageHandler,
+) error {
+	return c.consumeTopic(ctx, queueName, events.ApplicationDeadlineReminder, handler)
+}
+
+func (c *RabbitMQConsumer) consumeTopic(
+	ctx context.Context,
+	queueName string,
+	routingKey string,
+	handler MessageHandler,
+) error {
 	ch, err := c.conn.Channel()
 	if err != nil {
 		return err
@@ -56,7 +73,7 @@ func (c *RabbitMQConsumer) ConsumeApplicationStatusChanged(
 
 	if err := ch.QueueBind(
 		q.Name,
-		events.ApplicationStatusChanged,
+		routingKey,
 		ApplicationExchange,
 		false,
 		nil,

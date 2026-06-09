@@ -539,4 +539,7 @@
   "ui.profile.password.confirm": "Xác nhận mật khẩu mới",
   "ui.profile.password.save": "Đổi mật khẩu",
   "ui.msg.profile_updated": "Cập nhật thông tin cá nhân thành công"
+,
+  "notification.deadline_reminder.title": "Há»“ sÆ¡ [{code}] sáº¯p Ä‘áº¿n háº¡n",
+  "notification.deadline_reminder.message": "Há»“ sÆ¡ dá»‹ch vá»¥ \"{service}\" [{code}] sáº½ Ä‘áº¿n háº¡n trong vÃ²ng 48 giá»."
 }

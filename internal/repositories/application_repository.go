@@ -29,11 +29,13 @@ type DashboardRepository interface {
 type ApplicationRepository interface {
 	CreateWithAttachments(app *models.Application, atts []models.ApplicationAttachment, notif *models.Notification, codeGen func() string) error
 	GetByID(id string) (*models.Application, error)
+	ListDueWithin(now, until time.Time) ([]models.Application, error)
 	AdminList(filter ApplicationFilter, page, limit int) ([]models.Application, int64, error)
 	ListByCitizen(citizenUserID string, page, limit int) ([]models.Application, int64, error)
 	GetByIDForCitizen(id, citizenUserID string) (*models.Application, error)
 	ListStatusLogsByCitizen(appID, citizenUserID string, page, limit int, since *time.Time) ([]models.ApplicationStatusLog, int64, error)
 	CreateAttachments(appID string, atts []models.ApplicationAttachment) error
+	AttachmentExistsForApplication(applicationID string) (bool, error)
 	UpdateAssignedStaff(applicationID string, assignedStaffUserID *string, updatedBy string) error
 	ProcessStatusUpdate(appID string, oldStatus *models.ApplicationStatus, newStatus models.ApplicationStatus, resultNote string, rejectedReason string, processingStartedAt, completedAt *time.Time, updatedBy string, atts []models.ApplicationAttachment) error
 	DashboardRepository
@@ -109,6 +111,25 @@ func (r *applicationRepo) GetByID(id string) (*models.Application, error) {
 		return nil, err
 	}
 	return &app, nil
+}
+
+func (r *applicationRepo) ListDueWithin(now, until time.Time) ([]models.Application, error) {
+	var items []models.Application
+	err := r.db.
+		Preload("ServiceType", "deleted_at IS NULL").
+		Preload("ServiceType.ResponsibleDepartment", "deleted_at IS NULL").
+		Preload("ServiceType.ResponsibleDepartment.LeaderUser", "deleted_at IS NULL").
+		Preload("AssignedStaffUser", "deleted_at IS NULL").
+		Where("deleted_at IS NULL").
+		Where("due_at IS NOT NULL").
+		Where("due_at > ? AND due_at <= ?", now, until).
+		Where("status IN ?", []models.ApplicationStatus{
+			models.ApplicationStatusReceived,
+			models.ApplicationStatusProcessing,
+			models.ApplicationStatusNeedMoreInfo,
+		}).
+		Find(&items).Error
+	return items, err
 }
 
 func (r *applicationRepo) AdminList(filter ApplicationFilter, page, limit int) ([]models.Application, int64, error) {
@@ -217,6 +238,14 @@ func (r *applicationRepo) CreateAttachments(appID string, atts []models.Applicat
 		atts[i].ApplicationID = appID
 	}
 	return r.db.Create(&atts).Error
+}
+
+func (r *applicationRepo) AttachmentExistsForApplication(applicationID string) (bool, error) {
+	var count int64
+	err := r.db.Model(&models.ApplicationAttachment{}).
+		Where("application_id = ? AND deleted_at IS NULL", applicationID).
+		Count(&count).Error
+	return count > 0, err
 }
 
 func (r *applicationRepo) UpdateAssignedStaff(applicationID string, assignedStaffUserID *string, updatedBy string) error {

@@ -64,6 +64,7 @@ func (r *fakeAppUserRepo) SoftDelete(_ string, _ string) error                  
 
 type fakeAppRepo struct {
 	createErr    error
+	createdApp   *models.Application
 	apps         []models.Application
 	total        int64
 	listErr      error
@@ -75,7 +76,8 @@ type fakeAppRepo struct {
 	createAttErr error
 }
 
-func (r *fakeAppRepo) CreateWithAttachments(_ *models.Application, _ []models.ApplicationAttachment, _ *models.Notification, _ func() string) error {
+func (r *fakeAppRepo) CreateWithAttachments(app *models.Application, _ []models.ApplicationAttachment, _ *models.Notification, _ func() string) error {
+	r.createdApp = app
 	return r.createErr
 }
 func (r *fakeAppRepo) ListByCitizen(_ string, _, _ int) ([]models.Application, int64, error) {
@@ -98,6 +100,12 @@ func (r *fakeAppRepo) GetByID(id string) (*models.Application, error) {
 		return r.app, r.getErr
 	}
 	return nil, r.getErr
+}
+func (r *fakeAppRepo) ListDueWithin(_, _ time.Time) ([]models.Application, error) {
+	return r.apps, r.listErr
+}
+func (r *fakeAppRepo) AttachmentExistsForApplication(_ string) (bool, error) {
+	return false, nil
 }
 func (r *fakeAppRepo) UpdateAssignedStaff(applicationID string, assignedStaffUserID *string, updatedBy string) error {
 	return nil
@@ -131,6 +139,9 @@ func (s *fakeStorage) SaveApplicationFile(_ string, fh *multipart.FileHeader) (s
 }
 func (s *fakeStorage) RemoveApplicationDir(_ string) error { return nil }
 func (s *fakeStorage) RemoveFile(_ string) error           { return nil }
+func (s *fakeStorage) ListApplicationDirs() ([]utils.TempDirInfo, error) {
+	return nil, nil
+}
 
 type fakeMailer struct {
 	sent bool
@@ -227,6 +238,38 @@ func TestSubmitApplication_Success_NoFiles(t *testing.T) {
 		assert.NoError(t, json.Unmarshal(logger.entries[0].MetadataJSON, &metadata))
 		assert.Equal(t, "st-1", metadata["service_type_id"])
 		assert.Equal(t, float64(0), metadata["attachments"])
+	}
+}
+
+func TestSubmitApplication_SetsDueAtFromProcessingTime(t *testing.T) {
+	processingDays := 2
+	serviceType := &models.ServiceType{
+		ID:             "svc-1",
+		Name:           "Cap CCCD",
+		IsActive:       true,
+		FormSchema:     []byte(`{}`),
+		ProcessingTime: &processingDays,
+	}
+
+	repo := &fakeAppRepo{}
+	svc := newSvc(
+		repo,
+		&fakeAppServiceTypeRepo{st: serviceType},
+		&fakeAppUserRepo{user: &models.User{ID: "citizen-1", Email: "a@b.com", Name: "Citizen"}},
+		&fakeStorage{},
+		&fakeMailer{},
+	)
+
+	_, err := svc.SubmitApplication("citizen-1", &dtos.SubmitApplicationRequest{
+		ServiceTypeID: "svc-1",
+		SubmittedData: []byte(`{}`),
+	}, nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if repo.createdApp == nil || repo.createdApp.DueAt == nil {
+		t.Fatal("expected DueAt to be set")
 	}
 }
 

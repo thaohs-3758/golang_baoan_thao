@@ -47,6 +47,7 @@ func InitDB() *gorm.DB {
 		&models.ApplicationAttachment{},
 		&models.ApplicationStatusLog{},
 		&models.ApplicationAssignment{},
+		&models.ApplicationReminderLog{},
 		&models.Notification{},
 		&models.ActivityLog{},
 		&models.ImportExportLog{},

@@ -19,6 +19,7 @@ type Application struct {
 	ResultNote          string            `json:"result_note" gorm:"type:text"`
 	RejectedReason      string            `json:"rejected_reason" gorm:"type:text"`
 	SubmittedAt         time.Time         `json:"submitted_at" gorm:"not null;index"`
+	DueAt               *time.Time        `json:"due_at" gorm:"index"`
 	ProcessingStartedAt *time.Time        `json:"processing_started_at"`
 	CompletedAt         *time.Time        `json:"completed_at"`
 	CreatedAt           time.Time         `json:"created_at" gorm:"not null"`

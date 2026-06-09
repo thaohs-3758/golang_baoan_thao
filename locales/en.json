@@ -322,6 +322,8 @@
   "notification.approved.message": "Your application for service \"{service}\" has been approved. Please check the result in the application details.",
   "notification.rejected.title": "Application [{code}] has been rejected",
   "notification.rejected.message": "Your application for service \"{service}\" was rejected. Reason: {note}",
+  "notification.deadline_reminder.title": "Application [{code}] is due soon",
+  "notification.deadline_reminder.message": "Application \"{service}\" [{code}] is due within 48 hours.",
   "notification.marked_read": "Marked as read",
   "notification.all_marked_read": "All notifications marked as read",
   "ui.citizen.notifications.subtitle": "Application status updates and system messages",

@@ -55,3 +55,41 @@ func (p *RabbitMQPublisher) PublishApplicationStatusChanged(ctx context.Context,
 		},
 	)
 }
+
+func (p *RabbitMQPublisher) PublishApplicationDeadlineReminder(ctx context.Context, event events.ApplicationDeadlineReminderEvent) error {
+	ch, err := p.conn.Channel()
+	if err != nil {
+		return err
+	}
+	defer ch.Close()
+
+	if err := ch.ExchangeDeclare(
+		ApplicationExchange,
+		"topic",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	); err != nil {
+		return err
+	}
+
+	body, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
+	return ch.PublishWithContext(
+		ctx,
+		ApplicationExchange,
+		events.ApplicationDeadlineReminder,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType:  "application/json",
+			DeliveryMode: amqp.Persistent,
+			Body:         body,
+		},
+	)
+}
