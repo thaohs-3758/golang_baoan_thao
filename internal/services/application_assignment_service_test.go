@@ -21,6 +21,15 @@ type fakeAppRepoForAssign struct {
 func (r *fakeAppRepoForAssign) GetByID(id string) (*models.Application, error) {
 	return r.app, r.err
 }
+func (r *fakeAppRepoForAssign) ListDueWithin(_, _ time.Time) ([]models.Application, error) {
+	if r.app == nil {
+		return nil, r.err
+	}
+	return []models.Application{*r.app}, r.err
+}
+func (r *fakeAppRepoForAssign) AttachmentExistsForApplication(_ string) (bool, error) {
+	return false, nil
+}
 func (r *fakeAppRepoForAssign) UpdateAssignedStaff(_ string, _ *string, _ string) error {
 	return r.updateErr
 }

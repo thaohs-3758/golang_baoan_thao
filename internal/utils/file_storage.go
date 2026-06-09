@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/gabriel-vasile/mimetype"
 )
@@ -34,6 +35,12 @@ type FileStorage interface {
 	SaveApplicationFile(applicationID string, fh *multipart.FileHeader) (publicURL, sniffedMime string, savedSize int64, err error)
 	RemoveApplicationDir(applicationID string) error
 	RemoveFile(publicURL string) error
+	ListApplicationDirs() ([]TempDirInfo, error)
+}
+
+type TempDirInfo struct {
+	ApplicationID string
+	CreatedAt     time.Time
 }
 
 type LocalDiskStorage struct {
@@ -135,6 +142,33 @@ func (s *LocalDiskStorage) RemoveFile(publicURL string) error {
 	// best-effort remove
 	_ = os.Remove(path)
 	return nil
+}
+
+func (s *LocalDiskStorage) ListApplicationDirs() ([]TempDirInfo, error) {
+	root := filepath.Join(s.BaseDir, "applications")
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	out := make([]TempDirInfo, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, TempDirInfo{
+			ApplicationID: entry.Name(),
+			CreatedAt:     info.ModTime(),
+		})
+	}
+	return out, nil
 }
 
 func sanitizeFileName(raw string) (string, error) {

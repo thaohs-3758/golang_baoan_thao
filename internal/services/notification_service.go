@@ -2,6 +2,7 @@ package services
 
 import (
 	"github.com/awesome-academy/golang_baoan_thao/internal/dtos"
+	"github.com/awesome-academy/golang_baoan_thao/internal/models"
 	"github.com/awesome-academy/golang_baoan_thao/internal/repositories"
 )
 
@@ -11,6 +12,10 @@ type NotificationService struct {
 
 func NewNotificationService(repo repositories.NotificationRepository) *NotificationService {
 	return &NotificationService{repo: repo}
+}
+
+func (s *NotificationService) Create(notif *models.Notification) error {
+	return s.repo.Create(notif)
 }
 
 func (s *NotificationService) List(userID string, filter repositories.NotificationFilter, page, limit int) ([]dtos.NotificationResponse, int64, error) {

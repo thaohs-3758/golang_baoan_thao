@@ -699,3 +699,38 @@ func TestApplicationRepoAdminList_WithAssignedStaffFilter(t *testing.T) {
 		t.Fatalf("expected 1 item, got %d", len(items))
 	}
 }
+
+func TestApplicationRepoListDueWithin(t *testing.T) {
+	repo, mock, cleanup := newMockApplicationRepo(t)
+	defer cleanup()
+
+	now := time.Now()
+	rows := sqlmock.NewRows([]string{
+		"id", "application_code", "service_type_id", "citizen_user_id", "status",
+		"submitted_data", "submitted_at", "created_at", "updated_at", "due_at", "assigned_staff_user_id",
+	}).AddRow("app-1", "HS001", "svc-1", "citizen-1", "processing", []byte(`{}`), now, now, now, now.Add(24*time.Hour), "staff-1")
+
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "applications" WHERE deleted_at IS NULL AND due_at IS NOT NULL AND (due_at > $1 AND due_at <= $2) AND status IN ($3,$4,$5)`)).
+		WithArgs(now, now.Add(48*time.Hour), models.ApplicationStatusReceived, models.ApplicationStatusProcessing, models.ApplicationStatusNeedMoreInfo).
+		WillReturnRows(rows)
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "service_types" WHERE "service_types"."id" = $1 AND deleted_at IS NULL`)).
+		WithArgs("svc-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "responsible_department_id"}).AddRow("svc-1", "Service A", "dept-1"))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "departments" WHERE "departments"."id" = $1 AND deleted_at IS NULL`)).
+		WithArgs("dept-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name", "leader_user_id"}).AddRow("dept-1", "Dept A", "manager-1"))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "users" WHERE "users"."id" = $1 AND deleted_at IS NULL`)).
+		WithArgs("manager-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow("manager-1", "Manager A"))
+	mock.ExpectQuery(regexp.QuoteMeta(`SELECT * FROM "users" WHERE "users"."id" = $1 AND deleted_at IS NULL`)).
+		WithArgs("staff-1").
+		WillReturnRows(sqlmock.NewRows([]string{"id", "name"}).AddRow("staff-1", "Staff A"))
+
+	items, err := repo.ListDueWithin(now, now.Add(48*time.Hour))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+}

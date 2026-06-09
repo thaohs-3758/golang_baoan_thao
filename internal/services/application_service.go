@@ -105,6 +105,11 @@ func (s *ApplicationService) SubmitApplication(
 	}
 
 	now := time.Now()
+	var dueAt *time.Time
+	if st.ProcessingTime != nil && *st.ProcessingTime > 0 {
+		v := now.Add(time.Duration(*st.ProcessingTime) * 24 * time.Hour)
+		dueAt = &v
+	}
 	app := &models.Application{
 		ApplicationCode: utils.GenerateApplicationCode(),
 		CitizenUserID:   citizenUserID,
@@ -112,6 +117,7 @@ func (s *ApplicationService) SubmitApplication(
 		Status:          models.ApplicationStatusReceived,
 		SubmittedData:   req.SubmittedData,
 		SubmittedAt:     now,
+		DueAt:           dueAt,
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}

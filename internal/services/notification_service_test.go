@@ -17,6 +17,7 @@ type fakeNotificationRepo struct {
 	markReadErr  error
 	markAllErr   error
 	createErr    error
+	created      *models.Notification
 	countUnread  int64
 	countErr     error
 }
@@ -33,7 +34,8 @@ func (r *fakeNotificationRepo) MarkAllAsRead(_ string) error {
 	return r.markAllErr
 }
 
-func (r *fakeNotificationRepo) Create(_ *models.Notification) error {
+func (r *fakeNotificationRepo) Create(notif *models.Notification) error {
+	r.created = notif
 	return r.createErr
 }
 
@@ -133,4 +135,24 @@ func TestNotificationService_CountUnread_Error(t *testing.T) {
 	count, err := svc.CountUnread("u1")
 	assert.ErrorIs(t, err, repoErr)
 	assert.Equal(t, int64(0), count)
+}
+
+func TestNotificationServiceCreate(t *testing.T) {
+	repo := &fakeNotificationRepo{}
+	svc := NewNotificationService(repo)
+
+	notif := &models.Notification{
+		UserID:    "user-1",
+		Title:     "Deadline soon",
+		Message:   "Application HS001 is due within 48 hours.",
+		Type:      models.NotificationTypeDeadlineReminder,
+		CreatedAt: time.Now(),
+	}
+
+	if err := svc.Create(notif); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.created == nil {
+		t.Fatal("expected notification to be persisted")
+	}
 }

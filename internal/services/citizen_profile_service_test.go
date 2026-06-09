@@ -89,6 +89,12 @@ func (r *fakeProfileApplicationRepo) GetByID(id string) (*models.Application, er
 	}
 	return nil, r.err
 }
+func (r *fakeProfileApplicationRepo) ListDueWithin(_, _ time.Time) ([]models.Application, error) {
+	return r.apps, r.err
+}
+func (r *fakeProfileApplicationRepo) AttachmentExistsForApplication(_ string) (bool, error) {
+	return false, nil
+}
 func (r *fakeProfileApplicationRepo) UpdateAssignedStaff(applicationID string, assignedStaffUserID *string, updatedBy string) error {
 	return nil
 }

@@ -2,6 +2,7 @@ package configs
 
 import (
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -130,6 +131,53 @@ func TestCustomHTTPErrorHandler_AdminWebPath(t *testing.T) {
 	if rec.Body.Len() == 0 {
 		t.Fatal("expected non-empty response body (JSON fallback)")
 	}
+}
+
+func TestCustomHTTPErrorHandler_AdminLoginTooManyRequests(t *testing.T) {
+	if err := LoadI18nMessages("../../locales"); err != nil {
+		t.Fatalf("load i18n messages: %v", err)
+	}
+
+	e := echo.New()
+	renderer := &captureRenderer{}
+	e.Renderer = renderer
+
+	req := httptest.NewRequest(http.MethodPost, "/admin/login", nil)
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+	c.Set(LocaleKey, "en")
+
+	CustomHTTPErrorHandler(c, echo.NewHTTPError(http.StatusTooManyRequests, "common.too_many_requests"))
+
+	if rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected status %d, got %d", http.StatusTooManyRequests, rec.Code)
+	}
+	if renderer.templateName != "admin/pages/auth/login.html" {
+		t.Fatalf("expected admin login template, got %q", renderer.templateName)
+	}
+	if got := renderer.data["Error"]; got != "Too many requests. Please try again later." {
+		t.Fatalf("expected rate-limit message, got %#v", got)
+	}
+	if got := renderer.data["Title"]; got != "System Login" {
+		t.Fatalf("expected login title, got %#v", got)
+	}
+}
+
+type captureRenderer struct {
+	templateName string
+	data         map[string]any
+}
+
+func (r *captureRenderer) Render(_ *echo.Context, w io.Writer, templateName string, data any) error {
+	r.templateName = templateName
+	if m, ok := data.(map[string]interface{}); ok {
+		r.data = make(map[string]any, len(m))
+		for k, v := range m {
+			r.data[k] = v
+		}
+	}
+	_, _ = w.Write([]byte(templateName))
+	return nil
 }
 
 func TestCustomHTTPErrorHandler_CitizenWebPath(t *testing.T) {

@@ -41,6 +41,7 @@ const (
 	NotificationTypeNeedMoreInfo NotificationType = "need_more_info"
 	NotificationTypeResult       NotificationType = "result"
 	NotificationTypeSystem       NotificationType = "system"
+	NotificationTypeDeadlineReminder NotificationType = "deadline_reminder"
 )
 
 type AssignmentAction string

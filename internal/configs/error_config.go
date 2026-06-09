@@ -50,6 +50,15 @@ func CustomHTTPErrorHandler(c *echo.Context, err error) {
 		return
 	}
 
+	if code == http.StatusTooManyRequests {
+		if templateName, data, ok := authTooManyRequestsPage(c); ok {
+			if renderErr := c.Render(code, templateName, data); renderErr != nil {
+				c.JSON(code, map[string]interface{}{"errors": errorDetails, "code": code})
+			}
+			return
+		}
+	}
+
 	if isAdminWeb {
 		headingKey, messageKey := adminErrorKeys(code)
 		data := map[string]interface{}{
@@ -80,6 +89,32 @@ func CustomHTTPErrorHandler(c *echo.Context, err error) {
 	}
 
 	c.JSON(code, map[string]interface{}{"errors": errorDetails, "code": code})
+}
+
+func authTooManyRequestsPage(c *echo.Context) (string, map[string]interface{}, bool) {
+	path := c.Request().URL.Path
+	message := T(c, "common.too_many_requests", nil)
+
+	switch {
+	case path == "/admin/login":
+		return "admin/pages/auth/login.html", map[string]interface{}{
+			"Title":    T(c, "ui.form.admin_login", nil),
+			"Error":    message,
+			"FullPage": true,
+		}, true
+	case path == "/login":
+		return "citizen/pages/auth/login.html", map[string]interface{}{
+			"Title": T(c, "ui.form.citizen_login", nil),
+			"Error": message,
+		}, true
+	case path == "/register":
+		return "citizen/pages/auth/register.html", map[string]interface{}{
+			"Title": T(c, "ui.form.citizen_register", nil),
+			"Error": message,
+		}, true
+	default:
+		return "", nil, false
+	}
 }
 
 func adminErrorKeys(code int) (headingKey, messageKey string) {

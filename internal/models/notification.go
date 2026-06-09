@@ -10,7 +10,7 @@ type Notification struct {
 	Application   *Application     `json:"application" gorm:"foreignKey:ApplicationID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:SET NULL"`
 	Title         string           `json:"title" gorm:"type:varchar(255);not null"`
 	Message       string           `json:"message" gorm:"type:text;not null"`
-	Type          NotificationType `json:"type" gorm:"type:varchar(20);not null;default:'system';check:type IN ('received','need_more_info','result','system')"`
+	Type          NotificationType `json:"type" gorm:"type:varchar(30);not null;default:'system';check:type IN ('received','need_more_info','result','system','deadline_reminder')"`
 	IsRead        bool             `json:"is_read" gorm:"not null;default:false;index"`
 	ReadAt        *time.Time       `json:"read_at"`
 	CreatedAt     time.Time        `json:"created_at" gorm:"not null"`

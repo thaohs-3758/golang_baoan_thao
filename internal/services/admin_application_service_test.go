@@ -31,6 +31,12 @@ func (r *fakeAdminAppRepo) AdminList(filter repositories.ApplicationFilter, _, _
 func (r *fakeAdminAppRepo) GetByID(_ string) (*models.Application, error) {
 	return r.app, r.err
 }
+func (r *fakeAdminAppRepo) ListDueWithin(_, _ time.Time) ([]models.Application, error) {
+	return r.apps, r.err
+}
+func (r *fakeAdminAppRepo) AttachmentExistsForApplication(_ string) (bool, error) {
+	return false, nil
+}
 func (r *fakeAdminAppRepo) UpdateAssignedStaff(_ string, _ *string, _ string) error { return r.err }
 func (r *fakeAdminAppRepo) ProcessStatusUpdate(_ string, _ *models.ApplicationStatus, newStatus models.ApplicationStatus, resultNote string, _ string, _, _ *time.Time, _ string, _ []models.ApplicationAttachment) error {
 	r.processStatus = newStatus
