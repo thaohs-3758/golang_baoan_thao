@@ -17,17 +17,62 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: golang_baoan_thao_redis
+    restart: unless-stopped
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: golang_baoan_thao_rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
   app:
     build: .
     container_name: golang_baoan_thao_app
     restart: unless-stopped
+    env_file:
+      - .env
     ports:
       - "8080:8080"
     environment:
       DATABASE_URL: host=postgres user=postgres password=123456 dbname=service_management port=5432 sslmode=disable
+      REDIS_ADDR: redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      NOTIFICATION_SERVICE_URL: http://notification-service:8081
+      USE_NOTIFICATION_HTTP_CLIENT: "true"
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
+
+  notification-service:
+    build: .
+    container_name: golang_baoan_thao_notification_service
+    restart: unless-stopped
+    env_file:
+      - .env
+    command: ["./notification_service"]
+    ports:
+      - "8081:8081"
+    environment:
+      DATABASE_URL: host=postgres user=postgres password=123456 dbname=service_management port=5432 sslmode=disable
+      REDIS_ADDR: redis:6379
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      NOTIFICATION_SERVICE_PORT: 8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      rabbitmq:
+        condition: service_started
 
 volumes:
   postgres_data:

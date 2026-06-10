@@ -244,6 +244,30 @@ func TestNotificationRepo_Create_SetsCreatedAt(t *testing.T) {
 	}
 }
 
+func TestNotificationRepo_Create_DuplicateSourceEventIDIsIgnored(t *testing.T) {
+	repo, mock, cleanup := newMockNotificationRepo(t)
+	defer cleanup()
+
+	notif := &models.Notification{
+		UserID:  "user-1",
+		Title:   "Hello",
+		Message: "World",
+		Type:    models.NotificationTypeReceived,
+	}
+	eventID := "evt-submit-1"
+	notif.SourceEventID = &eventID
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`INSERT INTO "notifications"`)).
+		WillReturnError(gorm.ErrDuplicatedKey)
+	mock.ExpectRollback()
+
+	err := repo.Create(notif)
+	if err != nil {
+		t.Fatalf("expected nil on duplicate source event id, got %v", err)
+	}
+}
+
 func TestNotificationRepo_CountUnread(t *testing.T) {
 	repo, mock, cleanup := newMockNotificationRepo(t)
 	defer cleanup()

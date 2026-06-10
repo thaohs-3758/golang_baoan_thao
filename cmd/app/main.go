@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"github.com/awesome-academy/golang_baoan_thao/internal/cache"
+	"github.com/awesome-academy/golang_baoan_thao/internal/clients"
 	"github.com/awesome-academy/golang_baoan_thao/internal/configs"
 	"github.com/awesome-academy/golang_baoan_thao/internal/docs"
+	"github.com/awesome-academy/golang_baoan_thao/internal/dtos"
 	"github.com/awesome-academy/golang_baoan_thao/internal/handlers"
 	"github.com/awesome-academy/golang_baoan_thao/internal/middlewares"
 	"github.com/awesome-academy/golang_baoan_thao/internal/queue"
@@ -67,7 +69,16 @@ func main() {
 	serviceCatalogRepo := repositories.NewCachedServiceTypeRepository(baseServiceCatalogRepo, jsonCache)
 	notificationRepo := repositories.NewNotificationRepository(db)
 	notificationSvc := services.NewNotificationService(notificationRepo)
-	notificationHandler := handlers.NewNotificationHandler(notificationSvc)
+	var notificationBoundary interface {
+		List(userID string, filter repositories.NotificationFilter, page, limit int) ([]dtos.NotificationResponse, int64, error)
+		MarkAsRead(id, userID string) error
+		MarkAllAsRead(userID string) error
+		CountUnread(userID string) (int64, error)
+	} = notificationSvc
+	if os.Getenv("USE_NOTIFICATION_HTTP_CLIENT") == "true" {
+		notificationBoundary = clients.NewNotificationHTTPClient(configs.NotificationServiceURL(), nil)
+	}
+	notificationHandler := handlers.NewNotificationHandler(notificationBoundary)
 	activityLogRepo := repositories.NewActivityLogRepository(db)
 	activityLogSvc := services.NewActivityLogService(activityLogRepo)
 
@@ -77,7 +88,7 @@ func main() {
 	adminAuthHandler := handlers.NewAdminAuthHandler(authService).WithActivityLogger(activityLogSvc)
 	citizenWebHandler := handlers.NewCitizenWebHandler(authService).
 		WithActivityLogger(activityLogSvc).
-		WithNotificationService(notificationSvc)
+		WithNotificationService(notificationBoundary)
 
 	serviceCatalogSvc := services.NewServiceCatalogService(serviceCatalogRepo, activityLogSvc)
 	adminUserSvc := services.NewAdminUserService(userRepo, activityLogSvc)
@@ -117,13 +128,13 @@ func main() {
 	applicationAssignmentRepo := repositories.NewApplicationAssignmentRepo(db)
 	applicationAssignmentSvc := services.NewApplicationAssignmentService(applicationRepo, applicationAssignmentRepo, userRepo, activityLogSvc)
 	adminApplicationSvc := services.NewAdminApplicationService(applicationRepo, applicationAssignmentSvc, storage, activityLogSvc).
-		WithNotificationRepo(notificationRepo).
 		WithMailer(mailer).WithRealtimeNotifier(realtimeHub)
 	rabbitConn, err := queue.NewRabbitMQConnection()
 	if err != nil {
 		log.Printf("rabbitmq unavailable: %v", err)
 	} else {
 		eventPublisher := queue.NewRabbitMQPublisher(rabbitConn)
+		applicationSvc = applicationSvc.WithEventPublisher(eventPublisher)
 		adminApplicationSvc = adminApplicationSvc.WithEventPublisher(eventPublisher)
 	}
 	defer rabbitConn.Close()

@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"errors"
 	"time"
 
 	"github.com/awesome-academy/golang_baoan_thao/internal/models"
@@ -77,7 +78,11 @@ func (r *notificationRepo) Create(notif *models.Notification) error {
 	if notif.CreatedAt.IsZero() {
 		notif.CreatedAt = time.Now()
 	}
-	return r.db.Create(notif).Error
+	err := r.db.Create(notif).Error
+	if errors.Is(err, gorm.ErrDuplicatedKey) && notif.SourceEventID != nil && *notif.SourceEventID != "" {
+		return nil
+	}
+	return err
 }
 
 func (r *notificationRepo) CountUnread(userID string) (int64, error) {

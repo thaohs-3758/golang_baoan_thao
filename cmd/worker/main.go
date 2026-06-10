@@ -39,8 +39,6 @@ func main() {
 
 	applicationRepo := repositories.NewApplicationRepository(db)
 	reminderLogRepo := repositories.NewApplicationReminderLogRepository(db)
-	notificationRepo := repositories.NewNotificationRepository(db)
-	notificationSvc := services.NewNotificationService(notificationRepo)
 	uploadDir := utils.EnvOr("UPLOAD_DIR", "./uploads")
 	storage := utils.NewLocalDiskStorage(uploadDir, "/uploads")
 	smtpCfg := services.LoadSMTPConfigFromEnv()
@@ -88,33 +86,6 @@ func main() {
 		},
 	); err != nil {
 		log.Fatalf("failed to start email consumer: %v", err)
-	}
-
-	if err := consumer.ConsumeApplicationDeadlineReminder(
-		ctx,
-		"application.deadline_reminder.notification",
-		func(ctx context.Context, body []byte) error {
-			var event events.ApplicationDeadlineReminderEvent
-			if err := json.Unmarshal(body, &event); err != nil {
-				return err
-			}
-
-			params := map[string]string{
-				"code":    event.ApplicationCode,
-				"service": event.ServiceName,
-			}
-			notif := &models.Notification{
-				UserID:        event.RecipientUserID,
-				ApplicationID: &event.ApplicationID,
-				Title:         configs.TLang(configs.DefaultLocale, "notification.deadline_reminder.title", params),
-				Message:       configs.TLang(configs.DefaultLocale, "notification.deadline_reminder.message", params),
-				Type:          models.NotificationTypeDeadlineReminder,
-				CreatedAt:     time.Now(),
-			}
-			return notificationSvc.Create(notif)
-		},
-	); err != nil {
-		log.Fatalf("failed to start deadline reminder consumer: %v", err)
 	}
 
 	s := scheduler.New()

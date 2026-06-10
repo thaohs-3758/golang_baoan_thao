@@ -12,6 +12,7 @@ import (
 
 	"github.com/awesome-academy/golang_baoan_thao/internal/configs"
 	"github.com/awesome-academy/golang_baoan_thao/internal/dtos"
+	"github.com/awesome-academy/golang_baoan_thao/internal/events"
 	"github.com/awesome-academy/golang_baoan_thao/internal/models"
 	"github.com/awesome-academy/golang_baoan_thao/internal/repositories"
 	"github.com/awesome-academy/golang_baoan_thao/internal/utils"
@@ -47,6 +48,7 @@ type ApplicationService struct {
 	storage            utils.FileStorage
 	mailer             Mailer
 	activityLogger     activityLogger
+	eventPublisher     ApplicationEventPublisher
 }
 
 type activityLogger interface {
@@ -75,6 +77,11 @@ func NewApplicationService(
 		mailer:             mailer,
 		activityLogger:     logger,
 	}
+}
+
+func (s *ApplicationService) WithEventPublisher(publisher ApplicationEventPublisher) *ApplicationService {
+	s.eventPublisher = publisher
+	return s
 }
 
 func (s *ApplicationService) SubmitApplication(
@@ -150,19 +157,22 @@ func (s *ApplicationService) SubmitApplication(
 		})
 	}
 
-	loc := configs.DefaultLocale
-	notifParams := map[string]string{"code": app.ApplicationCode, "service": st.Name}
-	notif := &models.Notification{
-		UserID:    citizenUserID,
-		Title:     configs.TLang(loc, "notification.received.title", notifParams),
-		Message:   configs.TLang(loc, "notification.received.message", notifParams),
-		Type:      models.NotificationTypeReceived,
-		CreatedAt: now,
-	}
-
-	if err := s.appRepo.CreateWithAttachments(app, atts, notif, utils.GenerateApplicationCode); err != nil {
+	if err := s.appRepo.CreateWithAttachments(app, atts, utils.GenerateApplicationCode); err != nil {
 		_ = s.storage.RemoveApplicationDir(tmpID)
 		return nil, fmt.Errorf("create application: %w", err)
+	}
+	if s.eventPublisher != nil {
+		event := events.ApplicationSubmittedEvent{
+			EventID:         utils.GenerateUUID(),
+			ApplicationID:   app.ID,
+			ApplicationCode: app.ApplicationCode,
+			CitizenUserID:   citizenUserID,
+			ServiceName:     st.Name,
+			OccurredAt:      time.Now(),
+		}
+		if err := s.eventPublisher.PublishApplicationSubmitted(context.Background(), event); err != nil {
+			log.Printf("failed to publish application submitted event: %v", err)
+		}
 	}
 	s.logActivity(&models.ActivityLog{
 		ActorUserID: &citizenUserID,
