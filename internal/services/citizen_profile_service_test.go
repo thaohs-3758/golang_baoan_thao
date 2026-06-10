@@ -75,7 +75,7 @@ func (r *fakeProfileApplicationRepo) ListStatusLogsByCitizen(_, _ string, _, _ i
 func (r *fakeProfileApplicationRepo) CreateAttachments(_ string, _ []models.ApplicationAttachment) error {
 	return nil
 }
-func (r *fakeProfileApplicationRepo) CreateWithAttachments(_ *models.Application, _ []models.ApplicationAttachment, _ *models.Notification, _ func() string) error {
+func (r *fakeProfileApplicationRepo) CreateWithAttachments(_ *models.Application, _ []models.ApplicationAttachment, _ func() string) error {
 	return nil
 }
 func (r *fakeProfileApplicationRepo) AdminList(_ repositories.ApplicationFilter, page, limit int) ([]models.Application, int64, error) {
@@ -423,4 +423,3 @@ func TestChangeMyPassword_Success(t *testing.T) {
 	err = bcrypt.CompareHashAndPassword([]byte(userRepo.updated.PasswordHash), []byte("newpass123"))
 	assert.NoError(t, err)
 }
-

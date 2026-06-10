@@ -27,7 +27,7 @@ type DashboardRepository interface {
 }
 
 type ApplicationRepository interface {
-	CreateWithAttachments(app *models.Application, atts []models.ApplicationAttachment, notif *models.Notification, codeGen func() string) error
+	CreateWithAttachments(app *models.Application, atts []models.ApplicationAttachment, codeGen func() string) error
 	GetByID(id string) (*models.Application, error)
 	ListDueWithin(now, until time.Time) ([]models.Application, error)
 	AdminList(filter ApplicationFilter, page, limit int) ([]models.Application, int64, error)
@@ -59,7 +59,6 @@ func NewApplicationRepository(db *gorm.DB) ApplicationRepository {
 func (r *applicationRepo) CreateWithAttachments(
 	app *models.Application,
 	atts []models.ApplicationAttachment,
-	notif *models.Notification,
 	codeGen func() string,
 ) error {
 	var lastErr error
@@ -76,8 +75,7 @@ func (r *applicationRepo) CreateWithAttachments(
 					return err
 				}
 			}
-			notif.ApplicationID = &app.ID
-			return tx.Create(notif).Error
+			return nil
 		})
 		if err == nil {
 			return nil
@@ -92,8 +90,6 @@ func (r *applicationRepo) CreateWithAttachments(
 			atts[i].ID = ""
 			atts[i].ApplicationID = ""
 		}
-		notif.ID = ""
-		notif.ApplicationID = nil
 	}
 	return lastErr
 }

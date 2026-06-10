@@ -76,7 +76,7 @@ type fakeAppRepo struct {
 	createAttErr error
 }
 
-func (r *fakeAppRepo) CreateWithAttachments(app *models.Application, _ []models.ApplicationAttachment, _ *models.Notification, _ func() string) error {
+func (r *fakeAppRepo) CreateWithAttachments(app *models.Application, _ []models.ApplicationAttachment, _ func() string) error {
 	r.createdApp = app
 	return r.createErr
 }
@@ -302,6 +302,43 @@ func TestSubmitApplication_LogFailureDoesNotBreakMainFlow(t *testing.T) {
 
 	resp, err := svc.SubmitApplication("u1", validReq(), nil)
 
+	assert.NoError(t, err)
+	assert.NotNil(t, resp)
+}
+
+func TestSubmitApplication_PublishesApplicationSubmittedEvent(t *testing.T) {
+	repo := &fakeAppRepo{}
+	pub := &fakeApplicationEventPublisher{}
+	svc := newSvc(
+		repo,
+		&fakeAppServiceTypeRepo{st: activeServiceType()},
+		&fakeAppUserRepo{user: &models.User{ID: "u1", Email: "a@b.com", Name: "An"}},
+		&fakeStorage{},
+		&fakeMailer{},
+	).WithEventPublisher(pub)
+
+	_, err := svc.SubmitApplication("u1", validReq(), nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pub.published {
+		t.Fatal("expected publish call")
+	}
+	if pub.lastSubmitted.CitizenUserID != "u1" {
+		t.Fatalf("expected citizen u1, got %q", pub.lastSubmitted.CitizenUserID)
+	}
+}
+
+func TestSubmitApplication_PublishFailureDoesNotFailRequest(t *testing.T) {
+	svc := newSvc(
+		&fakeAppRepo{},
+		&fakeAppServiceTypeRepo{st: activeServiceType()},
+		&fakeAppUserRepo{user: &models.User{ID: "u1", Email: "a@b.com", Name: "An"}},
+		&fakeStorage{},
+		&fakeMailer{},
+	).WithEventPublisher(&fakeApplicationEventPublisher{err: errors.New("publish failed")})
+
+	resp, err := svc.SubmitApplication("u1", validReq(), nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, resp)
 }

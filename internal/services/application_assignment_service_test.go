@@ -35,7 +35,7 @@ func (r *fakeAppRepoForAssign) UpdateAssignedStaff(_ string, _ *string, _ string
 }
 
 // embed other methods to satisfy interface
-func (r *fakeAppRepoForAssign) CreateWithAttachments(app *models.Application, atts []models.ApplicationAttachment, notif *models.Notification, codeGen func() string) error {
+func (r *fakeAppRepoForAssign) CreateWithAttachments(app *models.Application, atts []models.ApplicationAttachment, codeGen func() string) error {
 	return nil
 }
 func (r *fakeAppRepoForAssign) ListByCitizen(citizenUserID string, page, limit int) ([]models.Application, int64, error) {

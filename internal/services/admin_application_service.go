@@ -27,6 +27,7 @@ type RealtimeNotifier interface {
 }
 
 type ApplicationEventPublisher interface {
+	PublishApplicationSubmitted(ctx context.Context, event events.ApplicationSubmittedEvent) error
 	PublishApplicationStatusChanged(ctx context.Context, event events.ApplicationStatusChangedEvent) error
 }
 
@@ -35,7 +36,6 @@ type AdminApplicationService struct {
 	assignService    *ApplicationAssignmentService
 	storage          utils.FileStorage
 	activityLogger   activityLogger
-	notificationRepo repositories.NotificationRepository
 	mailer           Mailer
 	emailService     *ApplicationEmailService
 	realTimeNotifier RealtimeNotifier
@@ -52,11 +52,6 @@ func NewAdminApplicationService(appRepo repositories.ApplicationRepository, assi
 
 func (s *AdminApplicationService) WithEventPublisher(publisher ApplicationEventPublisher) *AdminApplicationService {
 	s.eventPublisher = publisher
-	return s
-}
-
-func (s *AdminApplicationService) WithNotificationRepo(repo repositories.NotificationRepository) *AdminApplicationService {
-	s.notificationRepo = repo
 	return s
 }
 
@@ -185,7 +180,6 @@ func (s *AdminApplicationService) ProcessApplication(applicationID string, newSt
 		CreatedAt: now,
 	})
 
-	s.notifyCitizenStatusChange(app, newStatus, note, now)
 	s.notifyCitizenStatusChangeRealtime(app, newStatus, note)
 
 	event := events.ApplicationStatusChangedEvent{
@@ -193,6 +187,7 @@ func (s *AdminApplicationService) ProcessApplication(applicationID string, newSt
 		ApplicationID:   app.ID,
 		ApplicationCode: app.ApplicationCode,
 		CitizenUserID:   app.CitizenUserID,
+		ServiceName:     app.ServiceType.Name,
 		OldStatus:       string(oldStatus),
 		NewStatus:       string(newStatus),
 		Note:            note,
@@ -200,8 +195,10 @@ func (s *AdminApplicationService) ProcessApplication(applicationID string, newSt
 		OccurredAt:      time.Now(),
 	}
 
-	if err := s.eventPublisher.PublishApplicationStatusChanged(context.Background(), event); err != nil {
-		log.Printf("failed to publish application status changed event: %v", err)
+	if s.eventPublisher != nil {
+		if err := s.eventPublisher.PublishApplicationStatusChanged(context.Background(), event); err != nil {
+			log.Printf("failed to publish application status changed event: %v", err)
+		}
 	}
 
 	return nil
@@ -241,54 +238,6 @@ func (s *AdminApplicationService) notifyCitizenStatusChangeRealtime(app *models.
 		Status:          string(newStatus),
 		Message:         configs.TLang(configs.DefaultLocale, messageKey, params),
 	})
-}
-
-func (s *AdminApplicationService) notifyCitizenStatusChange(app *models.Application, newStatus models.ApplicationStatus, note string, now time.Time) {
-	if s.notificationRepo == nil || app == nil {
-		return
-	}
-	loc := configs.DefaultLocale
-	params := map[string]string{
-		"code":    app.ApplicationCode,
-		"service": app.ServiceType.Name,
-		"note":    strings.TrimSpace(note),
-	}
-
-	var titleKey, messageKey string
-	var notifType models.NotificationType
-	switch newStatus {
-	case models.ApplicationStatusProcessing:
-		titleKey = "notification.processing.title"
-		messageKey = "notification.processing.message"
-		notifType = models.NotificationTypeSystem
-	case models.ApplicationStatusNeedMoreInfo:
-		titleKey = "notification.need_more_info.title"
-		messageKey = "notification.need_more_info.message"
-		notifType = models.NotificationTypeNeedMoreInfo
-	case models.ApplicationStatusApproved:
-		titleKey = "notification.approved.title"
-		messageKey = "notification.approved.message"
-		notifType = models.NotificationTypeResult
-	case models.ApplicationStatusRejected:
-		titleKey = "notification.rejected.title"
-		messageKey = "notification.rejected.message"
-		notifType = models.NotificationTypeResult
-	default:
-		return
-	}
-
-	appID := app.ID
-	notif := &models.Notification{
-		UserID:        app.CitizenUserID,
-		ApplicationID: &appID,
-		Title:         configs.TLang(loc, titleKey, params),
-		Message:       configs.TLang(loc, messageKey, params),
-		Type:          notifType,
-		CreatedAt:     now,
-	}
-	if err := s.notificationRepo.Create(notif); err != nil {
-		log.Printf("create status-change notification failed for app %s: %v", app.ID, err)
-	}
 }
 
 func (s *AdminApplicationService) logActivity(entry *models.ActivityLog) {

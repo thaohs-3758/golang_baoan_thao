@@ -43,7 +43,7 @@ func (r *fakeAdminAppRepo) ProcessStatusUpdate(_ string, _ *models.ApplicationSt
 	r.processNote = resultNote
 	return r.err
 }
-func (r *fakeAdminAppRepo) CreateWithAttachments(_ *models.Application, _ []models.ApplicationAttachment, _ *models.Notification, _ func() string) error {
+func (r *fakeAdminAppRepo) CreateWithAttachments(_ *models.Application, _ []models.ApplicationAttachment, _ func() string) error {
 	return nil
 }
 func (r *fakeAdminAppRepo) ListByCitizen(_ string, _, _ int) ([]models.Application, int64, error) {
@@ -80,12 +80,21 @@ func newAdminAppSvcWithLogger(repo *fakeAdminAppRepo, logger activityLogger) *Ad
 }
 
 type fakeApplicationEventPublisher struct {
-	err       error
-	published bool
+	err               error
+	published         bool
+	lastSubmitted     events.ApplicationSubmittedEvent
+	lastStatusChanged events.ApplicationStatusChangedEvent
 }
 
-func (p *fakeApplicationEventPublisher) PublishApplicationStatusChanged(_ context.Context, _ events.ApplicationStatusChangedEvent) error {
+func (p *fakeApplicationEventPublisher) PublishApplicationSubmitted(_ context.Context, event events.ApplicationSubmittedEvent) error {
 	p.published = true
+	p.lastSubmitted = event
+	return p.err
+}
+
+func (p *fakeApplicationEventPublisher) PublishApplicationStatusChanged(_ context.Context, event events.ApplicationStatusChangedEvent) error {
+	p.published = true
+	p.lastStatusChanged = event
 	return p.err
 }
 
@@ -194,6 +203,48 @@ func TestAdminApplicationService_ProcessApplication_OK(t *testing.T) {
 	}
 }
 
+func TestAdminApplicationService_ProcessApplication_PublishesStableEventPayload(t *testing.T) {
+	prevStatus := models.ApplicationStatusReceived
+	repo := &fakeAdminAppRepo{
+		app: &models.Application{
+			ID:              "app1",
+			ApplicationCode: "HS001",
+			CitizenUserID:   "citizen-1",
+			Status:          prevStatus,
+			ServiceType:     models.ServiceType{Name: "Cap CCCD"},
+		},
+	}
+	pub := &fakeApplicationEventPublisher{}
+	svc := newAdminAppSvc(repo).WithEventPublisher(pub)
+
+	err := svc.ProcessApplication("app1", models.ApplicationStatusProcessing, "processing", nil, "admin-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pub.lastStatusChanged.ApplicationID != "app1" {
+		t.Fatalf("expected application id app1, got %q", pub.lastStatusChanged.ApplicationID)
+	}
+	if pub.lastStatusChanged.ApplicationCode != "HS001" {
+		t.Fatalf("expected application code HS001, got %q", pub.lastStatusChanged.ApplicationCode)
+	}
+	if pub.lastStatusChanged.CitizenUserID != "citizen-1" {
+		t.Fatalf("expected citizen-1, got %q", pub.lastStatusChanged.CitizenUserID)
+	}
+	if pub.lastStatusChanged.ServiceName != "Cap CCCD" {
+		t.Fatalf("expected service name Cap CCCD, got %q", pub.lastStatusChanged.ServiceName)
+	}
+}
+
+func TestAdminApplicationService_ProcessApplication_WithoutEventPublisher_DoesNotPanic(t *testing.T) {
+	prevStatus := models.ApplicationStatusReceived
+	repo := &fakeAdminAppRepo{app: &models.Application{ID: "app1", Status: prevStatus}}
+	svc := newAdminAppSvc(repo)
+
+	if err := svc.ProcessApplication("app1", models.ApplicationStatusProcessing, "processing", nil, "admin-1"); err != nil {
+		t.Fatalf("expected nil error, got %v", err)
+	}
+}
+
 func TestAdminApplicationService_ProcessApplication_LogFailureDoesNotBreakMainFlow(t *testing.T) {
 	prevStatus := models.ApplicationStatusReceived
 	repo := &fakeAdminAppRepo{app: &models.Application{ID: "app1", Status: prevStatus}}
@@ -288,31 +339,7 @@ func TestAdminApplicationService_ProcessApplication_RequireReasonForRejected(t *
 	assert.Equal(t, models.ApplicationStatus(""), repo.processStatus)
 }
 
-func TestAdminApplicationService_WithNotificationRepo(t *testing.T) {
-	repo := &fakeAdminAppRepo{}
-	svc := newAdminAppSvc(repo)
-	notifRepo := &fakeNotificationRepo{}
-
-	result := svc.WithNotificationRepo(notifRepo)
-	assert.Equal(t, svc, result, "WithNotificationRepo should return self")
-}
-
-func TestAdminApplicationService_ProcessApplication_SendsNotification(t *testing.T) {
-	repo := &fakeAdminAppRepo{app: &models.Application{
-		ID:              "app1",
-		ApplicationCode: "APP-1",
-		Status:          models.ApplicationStatusReceived,
-		ServiceType:     models.ServiceType{Name: "Test Service"},
-	}}
-	svc := newAdminAppSvc(repo)
-	notifRepo := &fakeNotificationRepo{}
-	svc.WithNotificationRepo(notifRepo)
-
-	err := svc.ProcessApplication("app1", models.ApplicationStatusProcessing, "Đang xử lý", nil, "admin-1")
-	assert.NoError(t, err)
-}
-
-func TestAdminApplicationService_ProcessApplication_SendsNotificationApproved(t *testing.T) {
+func TestAdminApplicationService_ProcessApplication_DoesNotSendDirectEmailApproved(t *testing.T) {
 	repo := &fakeAdminAppRepo{app: &models.Application{
 		ID:              "app1",
 		ApplicationCode: "APP-1",
@@ -321,13 +348,12 @@ func TestAdminApplicationService_ProcessApplication_SendsNotificationApproved(t 
 		ServiceType:     models.ServiceType{Name: "Test Service"},
 	}}
 	svc := newAdminAppSvc(repo)
-	svc.WithNotificationRepo(&fakeNotificationRepo{})
 	mailer := &fakeMailer{}
 	svc.mailer = mailer
 
 	err := svc.ProcessApplication("app1", models.ApplicationStatusApproved, "Approved", nil, "admin-1")
 	assert.NoError(t, err)
-	assert.True(t, mailer.sent)
+	assert.False(t, mailer.sent)
 }
 
 func TestAdminApplicationService_ProcessApplication_PublishesEventInsteadOfDirectEmail(t *testing.T) {
@@ -351,36 +377,25 @@ func TestAdminApplicationService_ProcessApplication_PublishesEventInsteadOfDirec
 	assert.False(t, mailer.sent)
 }
 
-func TestAdminApplicationService_ProcessApplication_SendsNotificationRejected(t *testing.T) {
+func TestAdminApplicationService_ProcessApplication_UsesEventBoundaryWithoutDirectNotificationWrite(t *testing.T) {
 	repo := &fakeAdminAppRepo{app: &models.Application{
 		ID:              "app1",
 		ApplicationCode: "APP-1",
 		Status:          models.ApplicationStatusProcessing,
+		CitizenUserID:   "citizen-1",
 		ServiceType:     models.ServiceType{Name: "Test Service"},
 	}}
-	svc := newAdminAppSvc(repo)
-	svc.WithNotificationRepo(&fakeNotificationRepo{})
+	publisher := &fakeApplicationEventPublisher{}
+	svc := newAdminAppSvc(repo).
+		WithEventPublisher(publisher)
 
-	err := svc.ProcessApplication("app1", models.ApplicationStatusRejected, "Rejected reason", nil, "admin-1")
+	err := svc.ProcessApplication("app1", models.ApplicationStatusApproved, "Approved", nil, "admin-1")
+
 	assert.NoError(t, err)
-}
-
-func TestAdminApplicationService_ProcessApplication_SendsNotificationNeedMoreInfo(t *testing.T) {
-	repo := &fakeAdminAppRepo{app: &models.Application{
-		ID:              "app1",
-		ApplicationCode: "APP-1",
-		Status:          models.ApplicationStatusProcessing,
-		ServiceType:     models.ServiceType{Name: "Test Service"},
-	}}
-	svc := newAdminAppSvc(repo)
-	svc.WithNotificationRepo(&fakeNotificationRepo{})
-
-	err := svc.ProcessApplication("app1", models.ApplicationStatusNeedMoreInfo, "Need more docs", nil, "admin-1")
-	assert.NoError(t, err)
+	assert.True(t, publisher.published)
 }
 
 func TestAdminApplicationService_ProcessApplication_DefaultStatusNoNotification(t *testing.T) {
-	// Test that notifyCitizenStatusChange with a "received" status (not in switch) is a no-op
 	repo := &fakeAdminAppRepo{app: &models.Application{
 		ID:              "app1",
 		ApplicationCode: "APP-1",
@@ -388,10 +403,7 @@ func TestAdminApplicationService_ProcessApplication_DefaultStatusNoNotification(
 		ServiceType:     models.ServiceType{Name: "Test Service"},
 	}}
 	svc := newAdminAppSvc(repo)
-	notifRepo := &fakeNotificationRepo{}
-	svc.WithNotificationRepo(notifRepo)
 
-	// Going back to Processing from NeedMoreInfo is valid
 	err := svc.ProcessApplication("app1", models.ApplicationStatusProcessing, "Resuming", nil, "admin-1")
 	assert.NoError(t, err)
 }
@@ -423,7 +435,7 @@ func TestAdminApplicationService_ProcessApplication_WithStorage_OK(t *testing.T)
 	assert.NoError(t, err)
 }
 
-func TestAdminApplicationService_ProcessApplication_EmailIncludesAttachmentURLs(t *testing.T) {
+func TestAdminApplicationService_ProcessApplication_DoesNotSendDirectEmailWithAttachments(t *testing.T) {
 	repo := &fakeAdminAppRepo{app: &models.Application{
 		ID:              "app1",
 		ApplicationCode: "APP-1",
@@ -440,8 +452,7 @@ func TestAdminApplicationService_ProcessApplication_EmailIncludesAttachmentURLs(
 	err := svc.ProcessApplication("app1", models.ApplicationStatusApproved, "approved", files, "admin-1")
 
 	assert.NoError(t, err)
-	assert.True(t, mailer.sent)
-	assert.Contains(t, mailer.body, "/uploads/app1/result.pdf")
+	assert.False(t, mailer.sent)
 }
 
 func TestAdminApplicationService_ProcessApplication_WithStorage_SaveError(t *testing.T) {

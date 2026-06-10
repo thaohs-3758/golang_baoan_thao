@@ -18,6 +18,14 @@ func NewRabbitMQConsumer(conn *amqp.Connection) *RabbitMQConsumer {
 	return &RabbitMQConsumer{conn: conn}
 }
 
+func (c *RabbitMQConsumer) ConsumeApplicationSubmitted(
+	ctx context.Context,
+	queueName string,
+	handler MessageHandler,
+) error {
+	return c.consumeTopic(ctx, queueName, events.ApplicationSubmitted, handler)
+}
+
 func (c *RabbitMQConsumer) ConsumeApplicationStatusChanged(
 	ctx context.Context,
 	queueName string,

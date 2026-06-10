@@ -18,6 +18,44 @@ func NewRabbitMQPublisher(conn *amqp.Connection) *RabbitMQPublisher {
 	return &RabbitMQPublisher{conn: conn}
 }
 
+func (p *RabbitMQPublisher) PublishApplicationSubmitted(ctx context.Context, event events.ApplicationSubmittedEvent) error {
+	ch, err := p.conn.Channel()
+	if err != nil {
+		return err
+	}
+	defer ch.Close()
+
+	if err := ch.ExchangeDeclare(
+		ApplicationExchange,
+		"topic",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	); err != nil {
+		return err
+	}
+
+	body, err := json.Marshal(event)
+	if err != nil {
+		return err
+	}
+
+	return ch.PublishWithContext(
+		ctx,
+		ApplicationExchange,
+		events.ApplicationSubmitted,
+		false,
+		false,
+		amqp.Publishing{
+			ContentType:  "application/json",
+			DeliveryMode: amqp.Persistent,
+			Body:         body,
+		},
+	)
+}
+
 func (p *RabbitMQPublisher) PublishApplicationStatusChanged(ctx context.Context, event events.ApplicationStatusChangedEvent) error {
 	ch, err := p.conn.Channel()
 	if err != nil {

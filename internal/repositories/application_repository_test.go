@@ -538,7 +538,6 @@ func TestApplicationRepoCreateWithAttachments_Success(t *testing.T) {
 
 	app := &models.Application{ApplicationCode: "APP-1"}
 	atts := []models.ApplicationAttachment{{FileName: "doc.pdf"}}
-	notif := &models.Notification{UserID: "u1", Title: "Test"}
 
 	mock.ExpectBegin()
 	// Insert application
@@ -547,12 +546,32 @@ func TestApplicationRepoCreateWithAttachments_Success(t *testing.T) {
 	// Insert attachments
 	mock.ExpectQuery(`INSERT INTO "application_attachments"`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("att-1"))
-	// Insert notification
-	mock.ExpectQuery(`INSERT INTO "notifications"`).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("notif-1"))
 	mock.ExpectCommit()
 
-	err := repo.CreateWithAttachments(app, atts, notif, func() string { return "APP-2" })
+	err := repo.CreateWithAttachments(app, atts, func() string { return "APP-2" })
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet expectations: %v", err)
+	}
+}
+
+func TestApplicationRepoCreateWithAttachments_Success_WithoutNotificationInsert(t *testing.T) {
+	repo, mock, cleanup := newMockApplicationRepo(t)
+	defer cleanup()
+
+	app := &models.Application{ApplicationCode: "APP-1"}
+	atts := []models.ApplicationAttachment{{FileName: "doc.pdf"}}
+
+	mock.ExpectBegin()
+	mock.ExpectQuery(`INSERT INTO "applications"`).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("app-1"))
+	mock.ExpectQuery(`INSERT INTO "application_attachments"`).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("att-1"))
+	mock.ExpectCommit()
+
+	err := repo.CreateWithAttachments(app, atts, func() string { return "APP-2" })
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -566,14 +585,13 @@ func TestApplicationRepoCreateWithAttachments_Error(t *testing.T) {
 	defer cleanup()
 
 	app := &models.Application{ApplicationCode: "APP-1"}
-	notif := &models.Notification{UserID: "u1", Title: "Test"}
 
 	dbErr := errors.New("unique constraint")
 	mock.ExpectBegin()
 	mock.ExpectQuery(`INSERT INTO "applications"`).WillReturnError(dbErr)
 	mock.ExpectRollback()
 
-	err := repo.CreateWithAttachments(app, nil, notif, func() string { return "APP-2" })
+	err := repo.CreateWithAttachments(app, nil, func() string { return "APP-2" })
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -628,7 +646,6 @@ func TestApplicationRepoCreateWithAttachments_ConflictRetry(t *testing.T) {
 	defer cleanup()
 
 	app := &models.Application{ApplicationCode: "APP-1"}
-	notif := &models.Notification{UserID: "u1", Title: "Test"}
 
 	conflictErr := errors.New(`pq: duplicate key value violates unique constraint "applications_application_code"`)
 
@@ -641,11 +658,9 @@ func TestApplicationRepoCreateWithAttachments_ConflictRetry(t *testing.T) {
 	mock.ExpectBegin()
 	mock.ExpectQuery(`INSERT INTO "applications"`).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("app-2"))
-	mock.ExpectQuery(`INSERT INTO "notifications"`).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow("notif-2"))
 	mock.ExpectCommit()
 
-	err := repo.CreateWithAttachments(app, nil, notif, func() string { return "APP-2" })
+	err := repo.CreateWithAttachments(app, nil, func() string { return "APP-2" })
 	if err != nil {
 		t.Fatalf("unexpected error after retry: %v", err)
 	}
